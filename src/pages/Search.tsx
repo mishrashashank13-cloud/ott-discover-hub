@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { tmdbApi } from "@/lib/tmdb";
 import { MovieCard } from "@/components/MovieCard";
 import { SearchBar } from "@/components/SearchBar";
@@ -8,7 +9,15 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Search as SearchIcon } from "lucide-react";
 
 export const Search = () => {
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchParams] = useSearchParams();
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || "");
+
+  useEffect(() => {
+    const queryParam = searchParams.get('q');
+    if (queryParam) {
+      setSearchQuery(queryParam);
+    }
+  }, [searchParams]);
 
   const {
     data: searchResults,

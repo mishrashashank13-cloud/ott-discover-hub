@@ -1,11 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { tmdbApi } from "@/lib/tmdb";
 import { MovieCard } from "@/components/MovieCard";
+import { SearchBar } from "@/components/SearchBar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, TrendingUp, Film, Tv } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export const Home = () => {
+  const navigate = useNavigate();
   const {
     data: trending,
     isLoading: trendingLoading,
@@ -69,9 +72,18 @@ export const Home = () => {
               <br />
               Movies & Shows
             </h1>
-            <p className="text-lg text-primary-foreground/80 max-w-md">
+            <p className="text-lg text-primary-foreground/80 max-w-md mb-8">
               Explore trending content, popular movies, and TV shows from around the world.
             </p>
+            
+            {/* Search Bar */}
+            <div className="max-w-2xl">
+              <SearchBar 
+                onSearch={(query) => navigate(`/search?q=${encodeURIComponent(query)}`)}
+                placeholder="Search movies, TV shows, genres..."
+                className="w-full"
+              />
+            </div>
           </div>
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
           <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full blur-2xl" />
