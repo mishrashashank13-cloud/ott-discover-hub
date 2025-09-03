@@ -96,7 +96,7 @@ export const Home = () => {
         <section className="mb-12">
           <SectionHeader 
             icon={TrendingUp} 
-            title="Top 5 Trending Movies" 
+            title="Trending Movies" 
             onViewMore={() => navigate('/search?category=trending-movies')} 
           />
           {trendingMoviesError ? (
