@@ -92,7 +92,7 @@ export const Home = () => {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
 
-        {/* Top 5 Trending Movies */}
+        {/* Trending Movies */}
         <section className="mb-12">
           <SectionHeader 
             icon={TrendingUp} 
@@ -106,7 +106,7 @@ export const Home = () => {
           ) : (
             <Carousel>
               <CarouselContent>
-                {trendingMovies?.results?.slice(0, 5).map((movie) => (
+                {trendingMovies?.results?.slice(0, 8).map((movie) => (
                   <CarouselItem key={movie.id} className="basis-1/2 md:basis-1/3 lg:basis-1/5">
                     <MovieCard item={movie} />
                   </CarouselItem>
