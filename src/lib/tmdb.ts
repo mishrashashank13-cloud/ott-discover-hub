@@ -54,8 +54,14 @@ export interface Credits {
   cast: CastMember[];
 }
 
-const tmdbFetch = async (endpoint: string) => {
-  const response = await fetch(`${TMDB_BASE_URL}${endpoint}?api_key=${TMDB_API_KEY}`);
+const tmdbFetch = async (endpoint: string, region?: string) => {
+  const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
+  url.searchParams.append('api_key', TMDB_API_KEY);
+  if (region) {
+    url.searchParams.append('region', region);
+  }
+  
+  const response = await fetch(url.toString());
   if (!response.ok) {
     throw new Error('Failed to fetch from TMDB');
   }
@@ -63,21 +69,37 @@ const tmdbFetch = async (endpoint: string) => {
 };
 
 export const tmdbApi = {
-  getTrending: async (): Promise<{ results: (Movie | TVShow)[] }> => {
-    return tmdbFetch('/trending/all/week');
+  getTrendingMovies: async (): Promise<{ results: Movie[] }> => {
+    return tmdbFetch('/trending/movie/week', 'IN');
+  },
+
+  getTrendingTVShows: async (): Promise<{ results: TVShow[] }> => {
+    return tmdbFetch('/trending/tv/week', 'IN');
+  },
+
+  getUpcomingMovies: async (): Promise<{ results: Movie[] }> => {
+    return tmdbFetch('/movie/upcoming', 'IN');
+  },
+
+  getUpcomingTVShows: async (): Promise<{ results: TVShow[] }> => {
+    return tmdbFetch('/tv/on_the_air', 'IN');
   },
 
   getPopularMovies: async (): Promise<{ results: Movie[] }> => {
-    return tmdbFetch('/movie/popular');
+    return tmdbFetch('/movie/popular', 'IN');
   },
 
   getPopularTVShows: async (): Promise<{ results: TVShow[] }> => {
-    return tmdbFetch('/tv/popular');
+    return tmdbFetch('/tv/popular', 'IN');
+  },
+
+  getTrending: async (): Promise<{ results: (Movie | TVShow)[] }> => {
+    return tmdbFetch('/trending/all/week', 'IN');
   },
 
   searchMulti: async (query: string): Promise<{ results: (Movie | TVShow)[] }> => {
     const encodedQuery = encodeURIComponent(query);
-    return tmdbFetch(`/search/multi?query=${encodedQuery}`);
+    return tmdbFetch(`/search/multi?query=${encodedQuery}`, 'IN');
   },
 
   getMovieDetails: async (id: number): Promise<MovieDetails> => {
