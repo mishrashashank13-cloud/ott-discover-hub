@@ -1,6 +1,8 @@
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
-const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p'
+const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
+const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p';
+
+// For demo purposes, using a public API key - in production, this should be handled server-side
+const TMDB_API_KEY = '4e44d9029b1270a757cddc766a1bcb63';
 
 export interface Movie {
   id: number;
@@ -53,25 +55,18 @@ export interface Credits {
 }
 
 const tmdbFetch = async (endpoint: string, region?: string) => {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    throw new Error('Supabase configuration missing')
-  }
-
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/tmdb-proxy`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-    },
-    body: JSON.stringify({ endpoint, region }),
-  })
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch from TMDB proxy')
+  const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
+  url.searchParams.append('api_key', TMDB_API_KEY);
+  if (region) {
+    url.searchParams.append('region', region);
   }
   
-  return response.json()
-}
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    throw new Error('Failed to fetch from TMDB');
+  }
+  return response.json();
+};
 
 export const tmdbApi = {
   getTrendingMovies: async (): Promise<{ results: Movie[] }> => {
