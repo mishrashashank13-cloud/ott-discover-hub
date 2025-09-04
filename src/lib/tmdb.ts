@@ -82,7 +82,9 @@ export const tmdbApi = {
   },
 
   getUpcomingTVShows: async (): Promise<{ results: TVShow[] }> => {
-    return tmdbFetch('/tv/on_the_air', 'IN');
+    const today = new Date().toISOString().split('T')[0];
+    const endpoint = `/discover/tv?language=en-US&sort_by=first_air_date.asc&first_air_date.gte=${today}&page=1`;
+    return tmdbFetch(endpoint);
   },
 
   getPopularMovies: async (): Promise<{ results: Movie[] }> => {
