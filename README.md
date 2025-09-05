@@ -71,3 +71,16 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+
+## Backend observability and timeouts
+
+- Access logs are enabled via FastAPI middleware and appear in your platform logs.
+- Upstream TMDB requests use a 10s timeout.
+
+## Rotate TMDB_ACCESS_TOKEN
+
+- Update the environment variable in your hosting platform (e.g., Vercel → Project Settings → Environment Variables).
+- Redeploy the project or restart the serverless function to apply changes.
+- Local development: update .env and restart the server: `uvicorn api.index:app --host 0.0.0.0 --port 8000`
+
+Note: There is no .env in production; use your platform's secrets/env vars.
