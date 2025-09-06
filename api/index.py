@@ -13,8 +13,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("api")
 
 TMDB_TOKEN = os.getenv("TMDB_ACCESS_TOKEN")
-if not TMDB_TOKEN:
-    raise RuntimeError("TMDB_ACCESS_TOKEN environment variable is not set")
+TMDB_API_KEY = os.getenv("TMDB_API_KEY", "4e44d9029b1270a757cddc766a1bcb63")
 
 TMDB_BASE = "https://api.themoviedb.org/3"
 
@@ -50,7 +49,7 @@ async def log_requests(request: Request, call_next):
 def upcoming_shows(page: int = Query(1, ge=1), language: str = "en-US"):
     today = date.today().isoformat()
     discover_url = f"{TMDB_BASE}/discover/tv"
-    headers = {"Authorization": f"Bearer {TMDB_TOKEN}"}
+    headers = {"Authorization": f"Bearer {TMDB_TOKEN}"} if TMDB_TOKEN else {}
 
     # Region and provider filtering (India)
     provider_names = [
@@ -73,7 +72,7 @@ def upcoming_shows(page: int = Query(1, ge=1), language: str = "en-US"):
         providers_resp = requests.get(
             f"{TMDB_BASE}/watch/providers/tv",
             headers=headers,
-            params={"watch_region": "IN"},
+            params={"watch_region": "IN", **({"api_key": TMDB_API_KEY} if not TMDB_TOKEN else {})},
             timeout=10,
         )
         if providers_resp.status_code == 200:
@@ -103,6 +102,8 @@ def upcoming_shows(page: int = Query(1, ge=1), language: str = "en-US"):
         "watch_region": "IN",  # region = India
         "include_adult": "false",
     }
+    if not TMDB_TOKEN:
+        params["api_key"] = TMDB_API_KEY
     if provider_ids:
         params["with_watch_providers"] = provider_ids
 
