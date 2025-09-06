@@ -82,9 +82,12 @@ export const tmdbApi = {
   },
 
   getUpcomingTVShows: async (): Promise<{ results: TVShow[] }> => {
-    const res = await fetch('/api/upcoming-shows');
-    if (!res.ok) throw new Error('Failed to fetch upcoming shows');
-    return res.json();
+    try {
+      const res = await fetch('/api/upcoming-shows');
+      if (res.ok) return res.json();
+    } catch (_) {}
+    const today = new Date().toISOString().slice(0, 10);
+    return tmdbFetch(`/discover/tv?first_air_date.gte=${today}&sort_by=first_air_date.asc&include_adult=false&watch_region=IN`);
   },
 
   getPopularMovies: async (): Promise<{ results: Movie[] }> => {
