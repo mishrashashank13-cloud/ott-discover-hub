@@ -84,8 +84,12 @@ export const tmdbApi = {
   getUpcomingTVShows: async (): Promise<{ results: TVShow[] }> => {
     try {
       const res = await fetch('/api/upcoming-shows');
-      if (res.ok) return res.json();
+      if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
+        const data = await res.json();
+        if (data && data.results) return data;
+      }
     } catch (_) {}
+    // Fallback to direct TMDB API
     const today = new Date().toISOString().slice(0, 10);
     return tmdbFetch(`/discover/tv?first_air_date.gte=${today}&sort_by=first_air_date.asc&include_adult=false&watch_region=IN`);
   },
