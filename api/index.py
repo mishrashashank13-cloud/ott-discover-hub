@@ -49,16 +49,65 @@ async def log_requests(request: Request, call_next):
 @app.get("/api/upcoming-shows")
 def upcoming_shows(page: int = Query(1, ge=1), language: str = "en-US"):
     today = date.today().isoformat()
-    url = f"{TMDB_BASE}/discover/tv"
+    discover_url = f"{TMDB_BASE}/discover/tv"
+    headers = {"Authorization": f"Bearer {TMDB_TOKEN}"}
+
+    # Region and provider filtering (India)
+    provider_names = [
+        "JioHotstar", "Amazon Prime Video", "Netflix", "ZEE5", "SonyLIV",
+        "Amazon MX Player", "ALTBalaji", "Aha", "Sun NXT", "ShemarooMe",
+        "Amazon miniTV", "Eros Now", "Hoichoi", "TVFPlay", "Apple TV+",
+        "Discovery+", "Lionsgate Play", "Mubi", "Hungama Play", "Viu",
+        "Arre", "Stage", "ManoramaMAX", "Chaupal", "Planet Marathi",
+        "EPIC ON", "JioTV", "BigFlix", "Spuul", "NammaFlix", "ReelDrama",
+        "Klikk", "Kanccha Lannka", "Kurinji", "Neestream", "Simply South",
+        "Tentkotta", "YuppTV", "HoiChoi TV (different from Hoichoi)",
+        "Disney+ (global app variant)", "Crunchyroll", "DocuBay", "ShortsTV",
+    ]
+
+    def _norm(s: str) -> str:
+        return "".join(ch.lower() for ch in s or "" if ch.isalnum())
+
+    provider_ids = ""
+    try:
+        providers_resp = requests.get(
+            f"{TMDB_BASE}/watch/providers/tv",
+            headers=headers,
+            params={"watch_region": "IN"},
+            timeout=10,
+        )
+        if providers_resp.status_code == 200:
+            providers = providers_resp.json().get("results", [])
+            desired = {_norm(name) for name in provider_names}
+            matched_ids = []
+            for p in providers:
+                name = str(p.get("provider_name", ""))
+                if _norm(name) in desired and p.get("provider_id") is not None:
+                    matched_ids.append(str(p["provider_id"]))
+            if matched_ids:
+                provider_ids = ",".join(sorted(set(matched_ids)))
+        else:
+            logger.warning(
+                "Failed to fetch watch providers: %s %s",
+                providers_resp.status_code,
+                providers_resp.text[:200],
+            )
+    except requests.RequestException as e:
+        logger.warning("Watch providers request failed: %s", e)
+
     params = {
         "language": language,
         "sort_by": "first_air_date.asc",
-        "first_air_date.gte": today,
+        "first_air_date.gte": today,  # future releases only
         "page": page,
+        "watch_region": "IN",  # region = India
+        "include_adult": "false",
     }
-    headers = {"Authorization": f"Bearer {TMDB_TOKEN}"}
+    if provider_ids:
+        params["with_watch_providers"] = provider_ids
+
     try:
-        r = requests.get(url, headers=headers, params=params, timeout=10)
+        r = requests.get(discover_url, headers=headers, params=params, timeout=10)
     except requests.RequestException as e:
         logger.error("TMDB request failed: %s", e)
         raise HTTPException(status_code=502, detail=str(e))
