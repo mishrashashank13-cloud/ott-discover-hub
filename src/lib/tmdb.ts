@@ -126,6 +126,16 @@ export const tmdbApi = {
   getTVShowCredits: async (id: number): Promise<Credits> => {
     return tmdbFetch(`/tv/${id}/credits`);
   },
+
+  getMoviesByGenre: async (genreIds: number[]): Promise<{ results: Movie[] }> => {
+    const genres = genreIds.join(',');
+    return tmdbFetch(`/discover/movie?with_genres=${genres}&sort_by=popularity.desc`, 'IN');
+  },
+
+  getTVShowsByGenre: async (genreIds: number[]): Promise<{ results: TVShow[] }> => {
+    const genres = genreIds.join(',');
+    return tmdbFetch(`/discover/tv?with_genres=${genres}&sort_by=popularity.desc`, 'IN');
+  },
 };
 
 export const getImageUrl = (path: string, size: 'w300' | 'w500' | 'w780' | 'original' = 'w500') => {

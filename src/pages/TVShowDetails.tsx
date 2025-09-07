@@ -1,10 +1,12 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { tmdbApi, getImageUrl } from "@/lib/tmdb";
+import { MovieCard } from "@/components/MovieCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { 
   ArrowLeft, 
   Star, 
@@ -37,6 +39,15 @@ export const TVShowDetails = () => {
     queryKey: ["tv-credits", showId],
     queryFn: () => tmdbApi.getTVShowCredits(showId),
     enabled: !!showId,
+  });
+
+  const {
+    data: similarShows,
+    isLoading: similarLoading,
+  } = useQuery({
+    queryKey: ["similar-shows", show?.genres?.map(g => g.id)],
+    queryFn: () => tmdbApi.getTVShowsByGenre(show?.genres?.map(g => g.id) || []),
+    enabled: !!show?.genres?.length,
   });
 
   if (showError || creditsError) {
@@ -201,6 +212,31 @@ export const TVShowDetails = () => {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Similar TV Shows */}
+            {similarShows && similarShows.results && similarShows.results.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <Tv className="h-5 w-5 text-primary" />
+                  <h2 className="text-xl font-semibold text-foreground">More Like This</h2>
+                </div>
+                
+                <Carousel>
+                  <CarouselContent>
+                    {similarShows.results
+                      .filter(item => item.id !== showId && item.poster_path)
+                      .slice(0, 10)
+                      .map((show) => (
+                        <CarouselItem key={show.id} className="basis-1/2 md:basis-1/3 lg:basis-1/5">
+                          <MovieCard item={show} />
+                        </CarouselItem>
+                      ))}
+                  </CarouselContent>
+                  <CarouselPrevious />
+                  <CarouselNext />
+                </Carousel>
               </div>
             )}
           </div>

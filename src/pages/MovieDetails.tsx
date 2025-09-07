@@ -1,17 +1,20 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { tmdbApi, getImageUrl } from "@/lib/tmdb";
+import { MovieCard } from "@/components/MovieCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { 
   ArrowLeft, 
   Star, 
   Calendar, 
   Clock, 
   Users, 
-  AlertCircle 
+  AlertCircle,
+  Film
 } from "lucide-react";
 
 export const MovieDetails = () => {
@@ -37,6 +40,15 @@ export const MovieDetails = () => {
     queryKey: ["movie-credits", movieId],
     queryFn: () => tmdbApi.getMovieCredits(movieId),
     enabled: !!movieId,
+  });
+
+  const {
+    data: similarMovies,
+    isLoading: similarLoading,
+  } = useQuery({
+    queryKey: ["similar-movies", movie?.genres?.map(g => g.id)],
+    queryFn: () => tmdbApi.getMoviesByGenre(movie?.genres?.map(g => g.id) || []),
+    enabled: !!movie?.genres?.length,
   });
 
   if (movieError || creditsError) {
@@ -207,6 +219,31 @@ export const MovieDetails = () => {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Similar Movies */}
+            {similarMovies && similarMovies.results && similarMovies.results.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <Film className="h-5 w-5 text-primary" />
+                  <h2 className="text-xl font-semibold text-foreground">More Like This</h2>
+                </div>
+                
+                <Carousel>
+                  <CarouselContent>
+                    {similarMovies.results
+                      .filter(item => item.id !== movieId && item.poster_path)
+                      .slice(0, 10)
+                      .map((movie) => (
+                        <CarouselItem key={movie.id} className="basis-1/2 md:basis-1/3 lg:basis-1/5">
+                          <MovieCard item={movie} />
+                        </CarouselItem>
+                      ))}
+                  </CarouselContent>
+                  <CarouselPrevious />
+                  <CarouselNext />
+                </Carousel>
               </div>
             )}
           </div>
