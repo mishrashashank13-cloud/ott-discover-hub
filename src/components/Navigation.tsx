@@ -2,11 +2,55 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { SearchBarCompact } from "@/components/SearchBarCompact";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Home, Search, Film, Globe } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Home, Search, Film, Globe, User, LogOut } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 export const Navigation = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [user, setUser] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Get initial session
+    const getInitialSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user ?? null);
+      setIsLoading(false);
+    };
+
+    getInitialSession();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setUser(session?.user ?? null);
+        setIsLoading(false);
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast({
+        title: "Signed out successfully",
+        description: "You have been logged out.",
+      });
+      navigate('/');
+    } catch (error) {
+      toast({
+        title: "Error signing out",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const isActive = (path: string) => {
     return location.pathname === path;
@@ -56,6 +100,32 @@ export const Navigation = () => {
                 placeholder="Search movies, TV shows..."
                 className="w-full"
               />
+            </div>
+
+            {/* Auth Section */}
+            <div className="flex items-center gap-2">
+              {!isLoading && !user ? (
+                <Button
+                  variant="default"
+                  size="sm"
+                  asChild
+                >
+                  <Link to="/auth" className="flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    <span className="hidden sm:inline">Login</span>
+                  </Link>
+                </Button>
+              ) : user ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSignOut}
+                  className="flex items-center gap-2"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span className="hidden sm:inline">Logout</span>
+                </Button>
+              ) : null}
             </div>
 
             {/* Language Selector */}
