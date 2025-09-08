@@ -13,6 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 export const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('');
+  const [mobileNumber, setMobileNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -41,7 +43,11 @@ export const Auth = () => {
         email,
         password,
         options: {
-          emailRedirectTo: redirectUrl
+          emailRedirectTo: redirectUrl,
+          data: {
+            username,
+            mobile_number: mobileNumber,
+          },
         }
       });
 
@@ -52,7 +58,12 @@ export const Auth = () => {
         description: "Please check your email to verify your account.",
       });
     } catch (error: any) {
-      setError(error.message);
+      const msg = String(error?.message ?? 'Sign up failed');
+      if (msg.toLowerCase().includes('profiles_username_key') || msg.toLowerCase().includes('duplicate key value')) {
+        setError('Username already taken. Please choose another.');
+      } else {
+        setError(msg);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -168,6 +179,33 @@ export const Auth = () => {
               
               <TabsContent value="signup" className="space-y-4">
                 <form onSubmit={handleSignUp} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-username">Username</Label>
+                    <Input
+                      id="signup-username"
+                      type="text"
+                      placeholder="Choose a unique username"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      required
+                      minLength={3}
+                      disabled={isLoading}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-mobile">Mobile number</Label>
+                    <Input
+                      id="signup-mobile"
+                      type="tel"
+                      placeholder="Enter your mobile number"
+                      value={mobileNumber}
+                      onChange={(e) => setMobileNumber(e.target.value)}
+                      required
+                      disabled={isLoading}
+                    />
+                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="signup-email">Email</Label>
                     <Input
