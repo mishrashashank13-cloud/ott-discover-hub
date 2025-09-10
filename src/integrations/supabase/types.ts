@@ -19,6 +19,7 @@ export type Database = {
           created_at: string
           id: string
           mobile_number: string | null
+          email: string | null
           updated_at: string
           user_id: string
           username: string
@@ -27,6 +28,7 @@ export type Database = {
           created_at?: string
           id?: string
           mobile_number?: string | null
+          email?: string | null
           updated_at?: string
           user_id: string
           username: string
@@ -35,11 +37,56 @@ export type Database = {
           created_at?: string
           id?: string
           mobile_number?: string | null
+          email?: string | null
           updated_at?: string
           user_id?: string
           username?: string
         }
         Relationships: []
+      }
+      reminders: {
+        Row: {
+          id: string
+          user_id: string
+          content_id: string
+          content_title: string | null
+          content_type: string | null
+          release_date: string
+          last_notified_on: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          content_id: string
+          content_title?: string | null
+          content_type?: string | null
+          release_date: string
+          last_notified_on?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          content_id?: string
+          content_title?: string | null
+          content_type?: string | null
+          release_date?: string
+          last_notified_on?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reminders_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
       }
     }
     Views: {

@@ -2,6 +2,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { tmdbApi, getImageUrl } from "@/lib/tmdb";
 import { MovieCard } from "@/components/MovieCard";
+import { RemindMeButton } from "@/components/RemindMeButton";
+import { TestButton } from "@/components/TestButton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -174,6 +176,23 @@ export const MovieDetails = () => {
                   {genre.name}
                 </Badge>
               ))}
+            </div>
+
+            {/* Test Button */}
+            <div className="flex gap-4 mb-4">
+              <TestButton />
+            </div>
+
+            {/* Remind Me Button */}
+            <div className="flex gap-4">
+              <RemindMeButton
+                contentId={movie.id.toString()}
+                contentTitle={movie.title}
+                contentType="movie"
+                releaseDate={movie.release_date}
+                variant="default"
+                size="lg"
+              />
             </div>
 
             {/* Overview */}

@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Star } from "lucide-react";
 import { Movie, TVShow, getImageUrl, isMovie } from "@/lib/tmdb";
 import { useNavigate } from "react-router-dom";
+import { RemindMeButton } from "@/components/RemindMeButton";
 
 interface MovieCardProps {
   item: Movie | TVShow;
@@ -53,9 +54,18 @@ export const MovieCard = ({ item, className }: MovieCardProps) => {
       <div className="p-4">
         <h3 className="font-semibold text-foreground line-clamp-1 mb-1">{title}</h3>
         <p className="text-sm text-muted-foreground mb-2">{year}</p>
-        <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+        <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed mb-3">
           {item.overview}
         </p>
+        <RemindMeButton
+          contentId={item.id.toString()}
+          contentTitle={title}
+          contentType={type}
+          releaseDate={releaseDate}
+          variant="outline"
+          size="sm"
+          className="w-full"
+        />
       </div>
     </Card>
   );

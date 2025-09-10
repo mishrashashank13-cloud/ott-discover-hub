@@ -9,5 +9,15 @@
       "source": "/api/(.*)",
       "destination": "/api/index.py"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/daily-reminders",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/weekly-digest",
+      "schedule": "0 2 * * 4"
+    }
   ]
 }
