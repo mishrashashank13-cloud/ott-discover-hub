@@ -8,6 +8,10 @@ import requests
 from dotenv import load_dotenv
 import pytz
 from typing import Optional
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from auth import router as auth_router  # added auth router import
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
@@ -33,6 +37,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth_router, prefix="/api/auth")  # mount auth endpoints
 
 # Simple access logging middleware
 @app.middleware("http")
@@ -140,6 +146,7 @@ def _fetch_supabase(path: str, params=None, method: str = "GET", json_body=None)
         "apikey": SUPABASE_ANON_KEY,
         "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
         "Content-Type": "application/json",
+        "Accept": "application/json",  # added Accept header
         "Prefer": "return=representation",
     }
     resp = requests.request(method, url, headers=headers, params=params, json=json_body, timeout=15)
@@ -232,9 +239,39 @@ def _notify_via_edge(email: str | None, phone: str | None, message: dict):
     # or call a separate edge function responsible for notifications.
     if not email and not phone:
         raise RuntimeError("No contact methods")
+    send_email(
+    sender_email="mishra.shashank13@gmail.com",
+    sender_password="roqchldhhnwxejqi",
+    receiver_email=email,
+    subject=message.get("subject"),
+    body=message.get("bodyText"))
     # For now just log
     logger.info("Notify email=%s phone=%s subject=%s", email, phone, message.get("subject"))
 
+def send_email(sender_email, sender_password, receiver_email, subject, body, smtp_server="smtp.gmail.com", port=587):
+    try:
+        # Create the email
+        msg = MIMEMultipart()
+        msg["From"] = sender_email
+        msg["To"] = receiver_email
+        msg["Subject"] = subject
+
+        # Attach the body as plain text
+        msg.attach(MIMEText(body, "plain"))
+
+        # Connect to the mail server
+        server = smtplib.SMTP(smtp_server, port)
+        server.starttls()  # Secure the connection
+        server.login(sender_email, sender_password)
+
+        # Send the email
+        server.sendmail(sender_email, receiver_email, msg.as_string())
+        server.quit()
+
+        print("✅ Email sent successfully!")
+
+    except Exception as e:
+        print("❌ Error:", e)
 
 @app.post("/api/cron/weekly-digest")
 def cron_weekly_digest():
@@ -255,7 +292,7 @@ def cron_weekly_digest():
     profiles = [p for p in resp.json() if p.get("email") or p.get("mobile_number")]
     subject = "New releases this week"
     top = releases[:10]
-    lines = [f"- {r.get('name') or r.get('original_name') or r.get('title')}"]
+    lines = [f"- {r.get('name') or r.get('original_name') or r.get('title')}" for r in top]
     body = "New and noteworthy releases this week:\n" + "\n".join(lines)
 
     sent = 0
