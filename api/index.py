@@ -215,9 +215,7 @@ def cron_daily_reminders():
             "bodyText": f"Hi! Your reminder for '{title}'. Release date: {release_date_str}. We'll keep you posted.",
         }
         try:
-            # Call frontend integration through a lightweight endpoint to keep env separation
-            # Alternatively, integrate mail/SMS providers directly here.
-            _notify_via_edge(email, phone, message)
+            _notify_via_edge(email, phone, message)  # _notify_via_edge is called here for each reminder
             sent += 1
         except Exception as e:
             logger.warning("Notification failed for user %s: %s", user_id, e)
@@ -240,11 +238,11 @@ def _notify_via_edge(email: str | None, phone: str | None, message: dict):
     if not email and not phone:
         raise RuntimeError("No contact methods")
     send_email(
-    sender_email="mishra.shashank13@gmail.com",
-    sender_password="roqchldhhnwxejqi",
-    receiver_email=email,
-    subject=message.get("subject"),
-    body=message.get("bodyText"))
+        sender_email="mishra.shashank13@gmail.com",
+        sender_password="roqchldhhnwxejqi",
+        receiver_email=email,
+        subject=message.get("subject"),
+        body=message.get("bodyText"))
     # For now just log
     logger.info("Notify email=%s phone=%s subject=%s", email, phone, message.get("subject"))
 
@@ -404,3 +402,23 @@ def get_user_reminders(
     except Exception as e:
         logger.error("Get user reminders failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Get user reminders failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/reminders/send-due")
+def send_due_reminders():
+    reminders = _list_due_reminders_for_today()  # reusing function to fetch due reminders
+    if not reminders:
+        return {"sent": 0, "message": "No due reminders"}
+    sent = 0
+    for rem in reminders:
+        user_id = rem.get("user_id")
+        profile = rem.get("profiles", {})
+        email = profile.get("email")
+        phone = profile.get("mobile_number")
+        title = rem.get("content_title") or rem.get("content_id")
+        release_date = rem.get("release_date")
+        message = {
+            "subject": f"Reminder: {title} releasing on {release_date}",
+            "bodyText": f"Your reminder for '{title}' is due. Release date: {release_date}.
