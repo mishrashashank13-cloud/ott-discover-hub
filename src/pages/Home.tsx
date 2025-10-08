@@ -4,8 +4,9 @@ import { MovieCard } from "@/components/MovieCard";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, TrendingUp, Film, Tv, Calendar, ArrowRight } from "lucide-react";
+import { AlertCircle, TrendingUp, Film, Tv, Calendar, ArrowRight, Star } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { Badge } from "@/components/ui/badge";
 
 export const Home = () => {
   const navigate = useNavigate();
@@ -91,6 +92,42 @@ export const Home = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
+
+        {/* Most Anticipated Releases Hero Section */}
+        <section className="mb-16">
+          <div className="flex items-center gap-3 mb-8">
+            <Star className="h-8 w-8 text-primary fill-primary" />
+            <h1 className="text-4xl font-bold text-foreground">Most Anticipated Releases</h1>
+          </div>
+          
+          {trendingMoviesLoading || trendingTVLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="space-y-3">
+                  <Skeleton className="aspect-[2/3] w-full rounded-lg" />
+                  <Skeleton className="h-5 w-full" />
+                  <Skeleton className="h-4 w-2/3" />
+                </div>
+              ))}
+            </div>
+          ) : trendingMoviesError && trendingTVError ? (
+            <ErrorAlert message="Failed to load most anticipated releases" />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[
+                ...(trendingMovies?.results?.slice(0, 2) || []),
+                ...(trendingTVShows?.results?.slice(0, 2) || [])
+              ].map((item) => (
+                <div key={item.id} className="group relative">
+                  <MovieCard item={item} className="transform transition-transform duration-300 group-hover:scale-105" />
+                  <Badge className="absolute top-2 right-2 bg-primary text-primary-foreground">
+                    Trending
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
         {/* Trending Movies */}
         <section className="mb-12">
