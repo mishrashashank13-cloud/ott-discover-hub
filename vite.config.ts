@@ -7,7 +7,7 @@ import { componentTagger } from "lovable-tagger";
 export default defineConfig(({ mode }) => ({
   server: {
     host: "localhost",
-    port: 8081, // explicitly use port 8081
+    port: 8080,
     proxy: {
       '/api': {
         target: process.env.BACKEND_URL || 'http://localhost:8000',
@@ -28,5 +28,4 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-}));
 }));
