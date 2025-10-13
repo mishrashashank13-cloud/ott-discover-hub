@@ -4,13 +4,22 @@ import { useSearchParams } from "react-router-dom";
 import { tmdbApi } from "@/lib/tmdb";
 import { MovieCard } from "@/components/MovieCard";
 import { SearchBar } from "@/components/SearchBar";
+import { FilterBar, FilterOptions } from "@/components/FilterBar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertCircle, Search as SearchIcon, TrendingUp, Film, Tv, Calendar } from "lucide-react";
 
 export const Search = () => {
   const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || "");
+  const [mediaType, setMediaType] = useState<"movie" | "tv">("movie");
+  const [filters, setFilters] = useState<FilterOptions>({
+    genres: [],
+    platforms: [],
+    language: "",
+    year: null,
+  });
   const category = searchParams.get('category');
 
   useEffect(() => {
@@ -29,6 +38,33 @@ export const Search = () => {
     queryKey: ["search", searchQuery],
     queryFn: () => tmdbApi.searchMulti(searchQuery),
     enabled: searchQuery.length > 0 && !category,
+  });
+
+  // Filtered discovery query
+  const {
+    data: filteredResults,
+    isLoading: filteredLoading,
+    error: filteredError,
+  } = useQuery({
+    queryKey: ["discover", mediaType, filters],
+    queryFn: () => {
+      const hasFilters = filters.genres.length > 0 || filters.platforms.length > 0 || filters.language || filters.year;
+      if (!hasFilters) return Promise.resolve({ results: [] });
+      
+      const discoverFilters = {
+        with_genres: filters.genres.join(","),
+        with_watch_providers: filters.platforms.join("|"),
+        with_original_language: filters.language,
+        primary_release_year: mediaType === "movie" ? filters.year || undefined : undefined,
+        first_air_date_year: mediaType === "tv" ? filters.year || undefined : undefined,
+        watch_region: "IN",
+      };
+      
+      return mediaType === "movie" 
+        ? tmdbApi.discoverMovies(discoverFilters)
+        : tmdbApi.discoverTVShows(discoverFilters);
+    },
+    enabled: !searchQuery && !category,
   });
 
   // Category-based queries
@@ -89,9 +125,13 @@ export const Search = () => {
     }
   };
 
-  const isLoading = category ? categoryLoading : searchLoading;
-  const error = category ? categoryError : searchError;
-  const results = category ? categoryResults?.results : searchResults?.results;
+  const handleFilterChange = (newFilters: FilterOptions) => {
+    setFilters(newFilters);
+  };
+
+  const isLoading = category ? categoryLoading : (searchQuery ? searchLoading : filteredLoading);
+  const error = category ? categoryError : (searchQuery ? searchError : filteredError);
+  const results = category ? categoryResults?.results : (searchQuery ? searchResults?.results : filteredResults?.results);
 
   return (
     <div className="min-h-screen bg-background">
@@ -126,6 +166,19 @@ export const Search = () => {
           </div>
 
           {!category && <SearchBar onSearch={handleSearch} className="w-full" />}
+          
+          {/* Filters - Show when not searching or in category mode */}
+          {!searchQuery && !category && (
+            <div className="mt-8 space-y-4">
+              <Tabs value={mediaType} onValueChange={(v) => setMediaType(v as "movie" | "tv")} className="w-full">
+                <TabsList className="grid w-full max-w-md mx-auto grid-cols-2">
+                  <TabsTrigger value="movie">Movies</TabsTrigger>
+                  <TabsTrigger value="tv">TV Shows</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <FilterBar mediaType={mediaType} onFilterChange={handleFilterChange} className="justify-center" />
+            </div>
+          )}
         </div>
 
         {/* Results */}

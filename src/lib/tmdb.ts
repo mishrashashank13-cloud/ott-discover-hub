@@ -54,6 +54,26 @@ export interface Credits {
   cast: CastMember[];
 }
 
+export interface Genre {
+  id: number;
+  name: string;
+}
+
+export interface WatchProvider {
+  provider_id: number;
+  provider_name: string;
+  logo_path: string;
+}
+
+export interface DiscoverFilters {
+  with_genres?: string;
+  with_watch_providers?: string;
+  with_original_language?: string;
+  primary_release_year?: number;
+  first_air_date_year?: number;
+  watch_region?: string;
+}
+
 const tmdbFetch = async (endpoint: string, region?: string) => {
   const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
   url.searchParams.append('api_key', TMDB_API_KEY);
@@ -135,6 +155,40 @@ export const tmdbApi = {
   getTVShowsByGenre: async (genreIds: number[]): Promise<{ results: TVShow[] }> => {
     const genres = genreIds.join(',');
     return tmdbFetch(`/discover/tv?with_genres=${genres}&sort_by=popularity.desc`, 'IN');
+  },
+
+  getMovieGenres: async (): Promise<{ genres: Genre[] }> => {
+    return tmdbFetch('/genre/movie/list');
+  },
+
+  getTVGenres: async (): Promise<{ genres: Genre[] }> => {
+    return tmdbFetch('/genre/tv/list');
+  },
+
+  getWatchProviders: async (region: string = 'IN'): Promise<{ results: WatchProvider[] }> => {
+    return tmdbFetch(`/watch/providers/movie?watch_region=${region}`);
+  },
+
+  discoverMovies: async (filters: DiscoverFilters): Promise<{ results: Movie[] }> => {
+    const params = new URLSearchParams();
+    if (filters.with_genres) params.append('with_genres', filters.with_genres);
+    if (filters.with_watch_providers) params.append('with_watch_providers', filters.with_watch_providers);
+    if (filters.with_original_language) params.append('with_original_language', filters.with_original_language);
+    if (filters.primary_release_year) params.append('primary_release_year', filters.primary_release_year.toString());
+    if (filters.watch_region) params.append('watch_region', filters.watch_region);
+    params.append('sort_by', 'popularity.desc');
+    return tmdbFetch(`/discover/movie?${params.toString()}`);
+  },
+
+  discoverTVShows: async (filters: DiscoverFilters): Promise<{ results: TVShow[] }> => {
+    const params = new URLSearchParams();
+    if (filters.with_genres) params.append('with_genres', filters.with_genres);
+    if (filters.with_watch_providers) params.append('with_watch_providers', filters.with_watch_providers);
+    if (filters.with_original_language) params.append('with_original_language', filters.with_original_language);
+    if (filters.first_air_date_year) params.append('first_air_date_year', filters.first_air_date_year.toString());
+    if (filters.watch_region) params.append('watch_region', filters.watch_region);
+    params.append('sort_by', 'popularity.desc');
+    return tmdbFetch(`/discover/tv?${params.toString()}`);
   },
 };
 
