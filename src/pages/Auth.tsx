@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Film, ArrowLeft, AlertCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
+import { PreferencesStep } from '@/components/PreferencesStep';
 
 export const Auth = () => {
   const [email, setEmail] = useState('');
@@ -18,6 +19,7 @@ export const Auth = () => {
   const [mobileNumber, setMobileNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [signupStep, setSignupStep] = useState<1 | 2>(1);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -56,8 +58,11 @@ export const Auth = () => {
 
       toast({
         title: "Account created!",
-        description: "Please check your email to verify your account.",
+        description: "Now let's set up your preferences.",
       });
+
+      // Move to step 2
+      setSignupStep(2);
     } catch (error: any) {
       const msg = String(error?.message ?? 'Sign up failed');
       if (msg.toLowerCase().includes('profiles_username_key') || msg.toLowerCase().includes('duplicate key value')) {
@@ -103,7 +108,7 @@ export const Auth = () => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/`,
+          redirectTo: `${window.location.origin}/auth?step=preferences`,
         },
       });
 
@@ -113,6 +118,43 @@ export const Auth = () => {
       setIsLoading(false);
     }
   };
+
+  // Check URL for preferences step
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('step') === 'preferences') {
+      setSignupStep(2);
+    }
+  }, []);
+
+  // Show preferences step if user just signed up
+  if (signupStep === 2) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-5xl space-y-6">
+          <div className="text-center">
+            <Button variant="ghost" size="sm" onClick={() => setSignupStep(1)} className="absolute top-4 left-4">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+            
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <Film className="h-8 w-8 text-primary" />
+              <span className="text-2xl font-bold bg-hero-gradient bg-clip-text text-transparent">
+                BingeGuide
+              </span>
+            </div>
+          </div>
+
+          <Card className="border-border bg-card">
+            <CardContent className="pt-6">
+              <PreferencesStep />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">

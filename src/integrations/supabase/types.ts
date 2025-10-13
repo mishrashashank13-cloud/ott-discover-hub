@@ -17,27 +17,27 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
+          email: string | null
           id: string
           mobile_number: string | null
-          email: string | null
           updated_at: string
           user_id: string
           username: string
         }
         Insert: {
           created_at?: string
+          email?: string | null
           id?: string
           mobile_number?: string | null
-          email?: string | null
           updated_at?: string
           user_id: string
           username: string
         }
         Update: {
           created_at?: string
+          email?: string | null
           id?: string
           mobile_number?: string | null
-          email?: string | null
           updated_at?: string
           user_id?: string
           username?: string
@@ -46,47 +46,69 @@ export type Database = {
       }
       reminders: {
         Row: {
-          id: string
-          user_id: string
           content_id: string
           content_title: string | null
           content_type: string | null
-          release_date: string
-          last_notified_on: string | null
           created_at: string
+          id: string
+          last_notified_on: string | null
+          release_date: string
           updated_at: string
+          user_id: string
         }
         Insert: {
-          id?: string
-          user_id: string
           content_id: string
           content_title?: string | null
           content_type?: string | null
-          release_date: string
-          last_notified_on?: string | null
           created_at?: string
+          id?: string
+          last_notified_on?: string | null
+          release_date: string
           updated_at?: string
+          user_id: string
         }
         Update: {
-          id?: string
-          user_id?: string
           content_id?: string
           content_title?: string | null
           content_type?: string | null
-          release_date?: string
-          last_notified_on?: string | null
           created_at?: string
+          id?: string
+          last_notified_on?: string | null
+          release_date?: string
           updated_at?: string
+          user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "reminders_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          }
-        ]
+        Relationships: []
+      }
+      user_preferences: {
+        Row: {
+          content_id: string
+          content_title: string | null
+          content_type: string
+          created_at: string
+          id: string
+          poster_path: string | null
+          user_id: string
+        }
+        Insert: {
+          content_id: string
+          content_title?: string | null
+          content_type: string
+          created_at?: string
+          id?: string
+          poster_path?: string | null
+          user_id: string
+        }
+        Update: {
+          content_id?: string
+          content_title?: string | null
+          content_type?: string
+          created_at?: string
+          id?: string
+          poster_path?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
     }
     Views: {
