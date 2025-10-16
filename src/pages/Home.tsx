@@ -4,12 +4,72 @@ import { MovieCard } from "@/components/MovieCard";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, TrendingUp, Film, Tv, Calendar, ArrowRight, Star } from "lucide-react";
+import { AlertCircle, TrendingUp, Film, Tv, Calendar, ArrowRight, Star, Heart } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useState } from "react";
 
 export const Home = () => {
   const navigate = useNavigate();
+  const [userId, setUserId] = useState<string | null>(null);
+  const [genreIds, setGenreIds] = useState<number[]>([]);
+  
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+        
+        // Fetch user preferences and extract genre IDs
+        const { data: preferences } = await supabase
+          .from('user_preferences')
+          .select('content_id, content_type')
+          .eq('user_id', user.id);
+        
+        if (preferences && preferences.length > 0) {
+          const genres = new Set<number>();
+          
+          // Fetch details for each preferred content to get genre IDs
+          for (const pref of preferences.slice(0, 5)) { // Limit to first 5 to avoid too many API calls
+            try {
+              if (pref.content_type === 'movie') {
+                const details = await tmdbApi.getMovieDetails(Number(pref.content_id));
+                details.genres.forEach(g => genres.add(g.id));
+              } else if (pref.content_type === 'tv') {
+                const details = await tmdbApi.getTVShowDetails(Number(pref.content_id));
+                details.genres.forEach(g => genres.add(g.id));
+              }
+            } catch (error) {
+              console.error('Error fetching content details:', error);
+            }
+          }
+          
+          setGenreIds(Array.from(genres));
+        }
+      }
+    };
+    
+    checkUser();
+  }, []);
+
+  const {
+    data: recommendedMovies,
+    isLoading: recommendedMoviesLoading,
+  } = useQuery({
+    queryKey: ["recommended-movies", genreIds],
+    queryFn: () => tmdbApi.getMoviesByGenre(genreIds),
+    enabled: genreIds.length > 0,
+  });
+
+  const {
+    data: recommendedTVShows,
+    isLoading: recommendedTVShowsLoading,
+  } = useQuery({
+    queryKey: ["recommended-tv", genreIds],
+    queryFn: () => tmdbApi.getTVShowsByGenre(genreIds),
+    enabled: genreIds.length > 0,
+  });
   
   const {
     data: trendingMovies,
@@ -92,6 +152,57 @@ export const Home = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
+
+        {/* Personalized Recommendations */}
+        {userId && genreIds.length > 0 && (
+          <>
+            <section className="mb-12">
+              <SectionHeader 
+                icon={Heart} 
+                title="Recommended Movies For You" 
+                onViewMore={() => navigate('/search?category=recommended')} 
+              />
+              {recommendedMoviesLoading ? (
+                <LoadingCarousel />
+              ) : (
+                <Carousel>
+                  <CarouselContent>
+                    {recommendedMovies?.results?.slice(0, 8).map((movie) => (
+                      <CarouselItem key={movie.id} className="basis-1/2 md:basis-1/3 lg:basis-1/5">
+                        <MovieCard item={movie} />
+                      </CarouselItem>
+                    ))}
+                  </CarouselContent>
+                  <CarouselPrevious />
+                  <CarouselNext />
+                </Carousel>
+              )}
+            </section>
+
+            <section className="mb-16">
+              <SectionHeader 
+                icon={Heart} 
+                title="Recommended Shows For You" 
+                onViewMore={() => navigate('/search?category=recommended')} 
+              />
+              {recommendedTVShowsLoading ? (
+                <LoadingCarousel />
+              ) : (
+                <Carousel>
+                  <CarouselContent>
+                    {recommendedTVShows?.results?.slice(0, 8).map((show) => (
+                      <CarouselItem key={show.id} className="basis-1/2 md:basis-1/3 lg:basis-1/5">
+                        <MovieCard item={show} />
+                      </CarouselItem>
+                    ))}
+                  </CarouselContent>
+                  <CarouselPrevious />
+                  <CarouselNext />
+                </Carousel>
+              )}
+            </section>
+          </>
+        )}
 
         {/* Most Anticipated Releases Hero Section */}
         <section className="mb-16">
