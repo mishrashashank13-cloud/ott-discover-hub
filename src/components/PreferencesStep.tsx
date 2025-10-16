@@ -22,12 +22,33 @@ export const PreferencesStep = () => {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
     loadClassicContent();
-  }, []);
+    
+    // Wait for auth session to be established
+    const checkSession = async () => {
+      // Wait a bit for the session to establish after signup
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUserId(session.user.id);
+      } else {
+        toast({
+          title: "Session Error",
+          description: "Please try logging in again.",
+          variant: "destructive",
+        });
+        navigate('/auth');
+      }
+    };
+    
+    checkSession();
+  }, [navigate, toast]);
 
   const loadClassicContent = async () => {
     try {
@@ -78,19 +99,22 @@ export const PreferencesStep = () => {
       return;
     }
 
+    if (!userId) {
+      toast({
+        title: "Error",
+        description: "Please wait for authentication to complete.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        throw new Error('User not found');
-      }
-
       // Prepare preferences data
       const preferences = Array.from(selectedIds).map((id) => {
         const item = content.find((c) => c.id === id);
         return {
-          user_id: user.id,
+          user_id: userId,
           content_id: String(id),
           content_type: item?.media_type || 'movie',
           content_title: item?.title || item?.name || '',
