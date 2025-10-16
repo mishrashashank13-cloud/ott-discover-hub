@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { SearchBarCompact } from "@/components/SearchBarCompact";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { Home, Search, Film, Globe, User, LogOut } from "lucide-react";
+import { Home, Search, Film, Globe, User, LogOut, LayoutDashboard } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -80,6 +80,19 @@ export const Navigation = () => {
                   <span className="hidden sm:inline">Home</span>
                 </Link>
               </Button>
+
+              {user && (
+                <Button
+                  variant={isActive("/dashboard") ? "default" : "ghost"}
+                  size="sm"
+                  asChild
+                >
+                  <Link to="/dashboard" className="flex items-center gap-2">
+                    <LayoutDashboard className="h-4 w-4" />
+                    <span className="hidden sm:inline">Dashboard</span>
+                  </Link>
+                </Button>
+              )}
 
               <Button
                 variant={isActive("/search") ? "default" : "ghost"}
