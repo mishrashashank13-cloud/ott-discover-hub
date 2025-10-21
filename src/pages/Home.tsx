@@ -8,7 +8,7 @@ import { AlertCircle, TrendingUp, Film, Tv, Calendar, ArrowRight, Star, Heart } 
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 
 export const Home = () => {
   const navigate = useNavigate();
@@ -106,6 +106,29 @@ export const Home = () => {
     queryKey: ["upcoming-tv"],
     queryFn: tmdbApi.getUpcomingTVShows,
   });
+
+  // Filter to only show content with release dates after today
+  const filteredUpcomingMovies = useMemo(() => {
+    if (!upcomingMovies?.results) return [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return upcomingMovies.results.filter(movie => {
+      if (!movie.release_date) return false;
+      const releaseDate = new Date(movie.release_date);
+      return releaseDate > today;
+    });
+  }, [upcomingMovies]);
+
+  const filteredUpcomingTVShows = useMemo(() => {
+    if (!upcomingTVShows?.results) return [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return upcomingTVShows.results.filter(show => {
+      if (!show.first_air_date) return false;
+      const airDate = new Date(show.first_air_date);
+      return airDate > today;
+    });
+  }, [upcomingTVShows]);
 
   const LoadingCarousel = () => (
     <Carousel>
@@ -303,10 +326,12 @@ export const Home = () => {
             <ErrorAlert message="Failed to load upcoming movies" />
           ) : upcomingMoviesLoading ? (
             <LoadingCarousel />
+          ) : filteredUpcomingMovies.length === 0 ? (
+            <ErrorAlert message="No upcoming movies found" />
           ) : (
             <Carousel>
               <CarouselContent>
-                {upcomingMovies?.results?.slice(0, 8).map((movie) => (
+                {filteredUpcomingMovies.slice(0, 8).map((movie) => (
                   <CarouselItem key={movie.id} className="basis-1/2 md:basis-1/3 lg:basis-1/5">
                     <MovieCard item={movie} />
                   </CarouselItem>
@@ -329,10 +354,12 @@ export const Home = () => {
             <ErrorAlert message="Failed to load upcoming web series" />
           ) : upcomingTVLoading ? (
             <LoadingCarousel />
+          ) : filteredUpcomingTVShows.length === 0 ? (
+            <ErrorAlert message="No upcoming web series found" />
           ) : (
             <Carousel>
               <CarouselContent>
-                {upcomingTVShows?.results?.slice(0, 8).map((show) => (
+                {filteredUpcomingTVShows.slice(0, 8).map((show) => (
                   <CarouselItem key={show.id} className="basis-1/2 md:basis-1/3 lg:basis-1/5">
                     <MovieCard item={show} />
                   </CarouselItem>
