@@ -15,7 +15,8 @@ import {
   Clock, 
   Users, 
   AlertCircle,
-  Film
+  Film,
+  Tv
 } from "lucide-react";
 
 export const MovieDetails = () => {
@@ -50,6 +51,14 @@ export const MovieDetails = () => {
     queryKey: ["similar-movies", movie?.genres?.map(g => g.id)],
     queryFn: () => tmdbApi.getMoviesByGenre(movie?.genres?.map(g => g.id) || []),
     enabled: !!movie?.genres?.length,
+  });
+
+  const {
+    data: watchProviders,
+  } = useQuery({
+    queryKey: ["movie-watch-providers", movieId],
+    queryFn: () => tmdbApi.getMovieWatchProviders(movieId),
+    enabled: !!movieId,
   });
 
   if (movieError || creditsError) {
@@ -176,6 +185,78 @@ export const MovieDetails = () => {
                 </Badge>
               ))}
             </div>
+
+            {/* OTT Platforms - Prominent Display */}
+            {watchProviders?.results?.IN && (
+              <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-l-4 border-primary rounded-lg p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <Tv className="h-6 w-6 text-primary" />
+                  <h2 className="text-2xl font-bold text-foreground">Watch Now</h2>
+                </div>
+                
+                {watchProviders.results.IN.flatrate && watchProviders.results.IN.flatrate.length > 0 && (
+                  <div className="space-y-3">
+                    <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Streaming</p>
+                    <div className="flex flex-wrap gap-4">
+                      {watchProviders.results.IN.flatrate.map((provider: any) => (
+                        <div key={provider.provider_id} className="flex flex-col items-center gap-2 group">
+                          <div className="relative">
+                            <img
+                              src={getImageUrl(provider.logo_path, 'w300')}
+                              alt={provider.provider_name}
+                              className="w-16 h-16 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-200"
+                            />
+                          </div>
+                          <span className="text-xs text-center font-medium max-w-[80px] truncate">
+                            {provider.provider_name}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {watchProviders.results.IN.rent && watchProviders.results.IN.rent.length > 0 && (
+                  <div className="space-y-3 mt-4">
+                    <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Rent</p>
+                    <div className="flex flex-wrap gap-4">
+                      {watchProviders.results.IN.rent.map((provider: any) => (
+                        <div key={provider.provider_id} className="flex flex-col items-center gap-2 group">
+                          <img
+                            src={getImageUrl(provider.logo_path, 'w300')}
+                            alt={provider.provider_name}
+                            className="w-16 h-16 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-200"
+                          />
+                          <span className="text-xs text-center font-medium max-w-[80px] truncate">
+                            {provider.provider_name}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {watchProviders.results.IN.buy && watchProviders.results.IN.buy.length > 0 && (
+                  <div className="space-y-3 mt-4">
+                    <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Buy</p>
+                    <div className="flex flex-wrap gap-4">
+                      {watchProviders.results.IN.buy.map((provider: any) => (
+                        <div key={provider.provider_id} className="flex flex-col items-center gap-2 group">
+                          <img
+                            src={getImageUrl(provider.logo_path, 'w300')}
+                            alt={provider.provider_name}
+                            className="w-16 h-16 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-200"
+                          />
+                          <span className="text-xs text-center font-medium max-w-[80px] truncate">
+                            {provider.provider_name}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Remind Me Button */}
             <div className="flex gap-4">

@@ -190,6 +190,14 @@ export const tmdbApi = {
     params.append('sort_by', 'popularity.desc');
     return tmdbFetch(`/discover/tv?${params.toString()}`);
   },
+
+  getMovieWatchProviders: async (id: number, region: string = 'IN') => {
+    return tmdbFetch(`/movie/${id}/watch/providers`);
+  },
+
+  getTVWatchProviders: async (id: number, region: string = 'IN') => {
+    return tmdbFetch(`/tv/${id}/watch/providers`);
+  },
 };
 
 export const getImageUrl = (path: string, size: 'w300' | 'w500' | 'w780' | 'original' = 'w500') => {
