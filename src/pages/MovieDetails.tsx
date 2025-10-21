@@ -16,7 +16,9 @@ import {
   Users, 
   AlertCircle,
   Film,
-  Tv
+  Tv,
+  Languages,
+  Subtitles
 } from "lucide-react";
 
 export const MovieDetails = () => {
@@ -185,6 +187,39 @@ export const MovieDetails = () => {
                 </Badge>
               ))}
             </div>
+
+            {/* Language and Subtitle Information */}
+            {movie.spoken_languages && movie.spoken_languages.length > 0 && (
+              <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                <div className="flex items-start gap-3">
+                  <Languages className="h-5 w-5 text-primary mt-0.5" />
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-foreground mb-2">Audio Languages</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {movie.spoken_languages.map((lang, index) => (
+                        <Badge key={index} variant="outline" className="text-xs">
+                          {lang.english_name}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-3">
+                  <Subtitles className="h-5 w-5 text-primary mt-0.5" />
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-foreground mb-2">Subtitles Available</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {movie.spoken_languages.map((lang, index) => (
+                        <Badge key={index} variant="outline" className="text-xs">
+                          {lang.english_name}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* OTT Platforms - Prominent Display */}
             {watchProviders?.results?.IN && (

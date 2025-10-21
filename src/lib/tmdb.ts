@@ -33,6 +33,8 @@ export interface MovieDetails extends Movie {
   runtime: number;
   tagline: string;
   production_companies: { id: number; name: string; logo_path: string }[];
+  spoken_languages: { english_name: string; iso_639_1: string; name: string }[];
+  original_language: string;
 }
 
 export interface TVShowDetails extends TVShow {
@@ -41,6 +43,8 @@ export interface TVShowDetails extends TVShow {
   number_of_episodes: number;
   tagline: string;
   production_companies: { id: number; name: string; logo_path: string }[];
+  spoken_languages: { english_name: string; iso_639_1: string; name: string }[];
+  original_language: string;
 }
 
 export interface CastMember {
