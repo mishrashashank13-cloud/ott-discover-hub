@@ -4,25 +4,33 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Check } from 'lucide-react';
-import { tmdbApi } from '@/lib/tmdb';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-interface Content {
+interface TasteClassic {
   id: number;
-  title?: string;
-  name?: string;
-  poster_path?: string;
-  media_type: 'movie' | 'tv';
+  title: string;
+  genre: string;
+  language: string;
+  year?: number;
+  poster_url?: string;
+  description?: string;
+  ott_platform?: string;
 }
 
 export const PreferencesStep = () => {
-  const [content, setContent] = useState<Content[]>([]);
+  const [content, setContent] = useState<TasteClassic[]>([]);
+  const [allContent, setAllContent] = useState<TasteClassic[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [selectedLanguage, setSelectedLanguage] = useState<string>('all');
+  const [selectedGenre, setSelectedGenre] = useState<string>('all');
+  const [languages, setLanguages] = useState<string[]>([]);
+  const [genres, setGenres] = useState<string[]>([]);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -50,21 +58,44 @@ export const PreferencesStep = () => {
     checkSession();
   }, [navigate, toast]);
 
+  useEffect(() => {
+    // Apply filters
+    let filtered = allContent;
+    
+    if (selectedLanguage !== 'all') {
+      filtered = filtered.filter(item => item.language === selectedLanguage);
+    }
+    
+    if (selectedGenre !== 'all') {
+      filtered = filtered.filter(item => item.genre === selectedGenre);
+    }
+    
+    setContent(filtered);
+  }, [selectedLanguage, selectedGenre, allContent]);
+
   const loadClassicContent = async () => {
     try {
-      // Fetch classic/popular movies and TV shows
-      const [moviesData, tvData] = await Promise.all([
-        tmdbApi.getPopularMovies(),
-        tmdbApi.getPopularTVShows(),
-      ]);
+      // Fetch classics from taste_classics table
+      // Note: taste_classics table exists but types need regeneration
+      const { data, error } = await (supabase as any)
+        .from('taste_classics')
+        .select('*')
+        .order('popularity_score', { ascending: false });
 
-      // Combine and take first 20 items
-      const allContent: Content[] = [
-        ...moviesData.results.slice(0, 10).map((m: any) => ({ ...m, media_type: 'movie' as const })),
-        ...tvData.results.slice(0, 10).map((t: any) => ({ ...t, media_type: 'tv' as const })),
-      ];
+      if (error) throw error;
 
-      setContent(allContent);
+      if (data) {
+        const classicsData = data as TasteClassic[];
+        setAllContent(classicsData);
+        setContent(classicsData);
+        
+        // Extract unique languages and genres for filters
+        const uniqueLanguages = [...new Set(classicsData.map(item => item.language))].filter(Boolean) as string[];
+        const uniqueGenres = [...new Set(classicsData.map(item => item.genre))].filter(Boolean) as string[];
+        
+        setLanguages(uniqueLanguages);
+        setGenres(uniqueGenres);
+      }
     } catch (error) {
       console.error('Error loading content:', error);
       toast({
@@ -93,7 +124,7 @@ export const PreferencesStep = () => {
     if (selectedIds.size === 0) {
       toast({
         title: "Selection required",
-        description: "Please select at least one movie or TV show.",
+        description: "Please select at least one classic.",
         variant: "destructive",
       });
       return;
@@ -110,15 +141,16 @@ export const PreferencesStep = () => {
 
     setIsSaving(true);
     try {
-      // Prepare preferences data
+      // Prepare preferences data for classics
       const preferences = Array.from(selectedIds).map((id) => {
-        const item = content.find((c) => c.id === id);
+        const item = allContent.find((c) => c.id === id);
         return {
           user_id: userId,
           content_id: String(id),
-          content_type: item?.media_type || 'movie',
-          content_title: item?.title || item?.name || '',
-          poster_path: item?.poster_path || null,
+          content_type: 'Classics',
+          content_title: item?.title || '',
+          poster_path: item?.poster_url || null,
+          reaction: 'Like',
         };
       });
 
@@ -158,20 +190,49 @@ export const PreferencesStep = () => {
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">
-        <h2 className="text-2xl font-bold">What do you like?</h2>
+        <h2 className="text-2xl font-bold">What classics do you like?</h2>
         <p className="text-muted-foreground">
-          Select movies and TV shows you enjoy. This helps us personalize your experience.
+          Select classic movies and TV shows you enjoy. This helps us personalize your experience.
         </p>
         <Badge variant="secondary" className="mt-2">
           {selectedIds.size} selected
         </Badge>
       </div>
 
+      <div className="flex gap-3">
+        <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Filter by language" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Languages</SelectItem>
+            {languages.map((lang) => (
+              <SelectItem key={lang} value={lang}>
+                {lang}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={selectedGenre} onValueChange={setSelectedGenre}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Filter by genre" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Genres</SelectItem>
+            {genres.map((genre) => (
+              <SelectItem key={genre} value={genre}>
+                {genre}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       <ScrollArea className="h-[500px] pr-4">
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
           {content.map((item) => {
             const isSelected = selectedIds.has(item.id);
-            const title = item.title || item.name || 'Untitled';
 
             return (
               <Card
@@ -182,10 +243,10 @@ export const PreferencesStep = () => {
                 onClick={() => toggleSelection(item.id)}
               >
                 <CardContent className="p-0 relative">
-                  {item.poster_path ? (
+                  {item.poster_url ? (
                     <img
-                      src={`https://image.tmdb.org/t/p/w300${item.poster_path}`}
-                      alt={title}
+                      src={item.poster_url}
+                      alt={item.title}
                       className="w-full h-auto rounded-t-lg"
                     />
                   ) : (
@@ -201,10 +262,15 @@ export const PreferencesStep = () => {
                   )}
                   
                   <div className="p-2">
-                    <p className="text-xs font-medium line-clamp-2">{title}</p>
-                    <Badge variant="outline" className="text-xs mt-1">
-                      {item.media_type === 'movie' ? 'Movie' : 'TV Show'}
-                    </Badge>
+                    <p className="text-xs font-medium line-clamp-2">{item.title}</p>
+                    <div className="flex gap-1 mt-1 flex-wrap">
+                      <Badge variant="outline" className="text-xs">
+                        {item.genre}
+                      </Badge>
+                      <Badge variant="secondary" className="text-xs">
+                        {item.language}
+                      </Badge>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
