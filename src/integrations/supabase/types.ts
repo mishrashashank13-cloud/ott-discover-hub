@@ -80,6 +80,42 @@ export type Database = {
         }
         Relationships: []
       }
+      taste_classics: {
+        Row: {
+          description: string | null
+          genre: string
+          id: number
+          language: string
+          ott_platform: string | null
+          popularity_score: number | null
+          poster_url: string | null
+          title: string
+          year: number | null
+        }
+        Insert: {
+          description?: string | null
+          genre: string
+          id?: number
+          language: string
+          ott_platform?: string | null
+          popularity_score?: number | null
+          poster_url?: string | null
+          title: string
+          year?: number | null
+        }
+        Update: {
+          description?: string | null
+          genre?: string
+          id?: number
+          language?: string
+          ott_platform?: string | null
+          popularity_score?: number | null
+          poster_url?: string | null
+          title?: string
+          year?: number | null
+        }
+        Relationships: []
+      }
       user_preferences: {
         Row: {
           content_id: string
@@ -88,6 +124,7 @@ export type Database = {
           created_at: string
           id: string
           poster_path: string | null
+          reaction: string | null
           user_id: string
         }
         Insert: {
@@ -97,6 +134,7 @@ export type Database = {
           created_at?: string
           id?: string
           poster_path?: string | null
+          reaction?: string | null
           user_id: string
         }
         Update: {
@@ -106,6 +144,7 @@ export type Database = {
           created_at?: string
           id?: string
           poster_path?: string | null
+          reaction?: string | null
           user_id?: string
         }
         Relationships: []
