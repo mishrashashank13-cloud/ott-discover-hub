@@ -76,8 +76,8 @@ export const Home = () => {
     isLoading: trendingMoviesLoading,
     error: trendingMoviesError,
   } = useQuery({
-    queryKey: ["trending-movies"],
-    queryFn: tmdbApi.getTrendingMovies,
+    queryKey: ["ott-movies"],
+    queryFn: () => tmdbApi.getOTTMovies('popularity.desc'),
   });
 
   const {
@@ -85,8 +85,8 @@ export const Home = () => {
     isLoading: trendingTVLoading,
     error: trendingTVError,
   } = useQuery({
-    queryKey: ["trending-tv"],
-    queryFn: tmdbApi.getTrendingTVShows,
+    queryKey: ["ott-tv"],
+    queryFn: () => tmdbApi.getOTTTVShows('popularity.desc'),
   });
 
   const {
@@ -94,8 +94,8 @@ export const Home = () => {
     isLoading: upcomingMoviesLoading,
     error: upcomingMoviesError,
   } = useQuery({
-    queryKey: ["upcoming-movies"],
-    queryFn: tmdbApi.getUpcomingMovies,
+    queryKey: ["upcoming-ott-movies"],
+    queryFn: tmdbApi.getUpcomingOTTMovies,
   });
 
   const {
@@ -103,8 +103,8 @@ export const Home = () => {
     isLoading: upcomingTVLoading,
     error: upcomingTVError,
   } = useQuery({
-    queryKey: ["upcoming-tv"],
-    queryFn: tmdbApi.getUpcomingTVShows,
+    queryKey: ["upcoming-ott-tv"],
+    queryFn: tmdbApi.getUpcomingOTTTVShows,
   });
 
   // Filter to only show content with release dates after today

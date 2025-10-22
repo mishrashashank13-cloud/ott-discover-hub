@@ -202,6 +202,30 @@ export const tmdbApi = {
   getTVWatchProviders: async (id: number, region: string = 'IN') => {
     return tmdbFetch(`/tv/${id}/watch/providers`);
   },
+
+  // Get OTT-available content only (with popular streaming providers)
+  getOTTMovies: async (sortBy: 'popularity.desc' | 'vote_average.desc' = 'popularity.desc'): Promise<{ results: Movie[] }> => {
+    // Popular OTT providers in India: Netflix (8), Prime Video (119), Disney+ Hotstar (122), etc.
+    const ottProviders = '8|119|122|337|463|531'; // Netflix, Prime, Hotstar, Disney+, Jio Cinema, Zee5
+    return tmdbFetch(`/discover/movie?with_watch_providers=${ottProviders}&watch_region=IN&sort_by=${sortBy}`);
+  },
+
+  getOTTTVShows: async (sortBy: 'popularity.desc' | 'vote_average.desc' = 'popularity.desc'): Promise<{ results: TVShow[] }> => {
+    const ottProviders = '8|119|122|337|463|531';
+    return tmdbFetch(`/discover/tv?with_watch_providers=${ottProviders}&watch_region=IN&sort_by=${sortBy}`);
+  },
+
+  getUpcomingOTTMovies: async (): Promise<{ results: Movie[] }> => {
+    const today = new Date().toISOString().slice(0, 10);
+    const ottProviders = '8|119|122|337|463|531';
+    return tmdbFetch(`/discover/movie?with_watch_providers=${ottProviders}&watch_region=IN&primary_release_date.gte=${today}&sort_by=primary_release_date.asc`);
+  },
+
+  getUpcomingOTTTVShows: async (): Promise<{ results: TVShow[] }> => {
+    const today = new Date().toISOString().slice(0, 10);
+    const ottProviders = '8|119|122|337|463|531';
+    return tmdbFetch(`/discover/tv?with_watch_providers=${ottProviders}&watch_region=IN&first_air_date.gte=${today}&sort_by=first_air_date.asc`);
+  },
 };
 
 export const getImageUrl = (path: string, size: 'w300' | 'w500' | 'w780' | 'original' = 'w500') => {
