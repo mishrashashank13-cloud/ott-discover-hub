@@ -103,8 +103,8 @@ export const Home = () => {
     isLoading: upcomingTVLoading,
     error: upcomingTVError,
   } = useQuery({
-    queryKey: ["upcoming-ott-tv"],
-    queryFn: tmdbApi.getUpcomingOTTTVShows,
+    queryKey: ["upcoming-tv"],
+    queryFn: tmdbApi.getUpcomingTVShows,
   });
 
   // Filter to only show content with release dates after today
