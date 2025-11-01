@@ -94,8 +94,21 @@ export const Auth = () => {
     }
 
     try {
+      // Check if email already exists
+      const { data: existingUsers } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('email', email)
+        .limit(1);
+
+      if (existingUsers && existingUsers.length > 0) {
+        setError('This email is already registered. Please sign in instead.');
+        setIsLoading(false);
+        return;
+      }
+
       const redirectUrl = `${window.location.origin}/auth?step=preferences`;
-      const { error } = await supabase.auth.signUp({
+      const { error, data } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -109,6 +122,13 @@ export const Auth = () => {
 
       if (error) throw error;
 
+      // Check if user already exists (Supabase returns success but with null session for existing users)
+      if (data?.user && !data?.session) {
+        setError('This email is already registered. Please check your inbox for the confirmation email or sign in.');
+        setIsLoading(false);
+        return;
+      }
+
       toast({
         title: "Confirm your email",
         description: "Check your inbox and verify your email to continue.",
@@ -119,6 +139,8 @@ export const Auth = () => {
       const msg = String(error?.message ?? 'Sign up failed');
       if (msg.toLowerCase().includes('username') && msg.toLowerCase().includes('duplicate')) {
         setError('Username already taken. Please choose another.');
+      } else if (msg.toLowerCase().includes('user already registered') || msg.toLowerCase().includes('email already')) {
+        setError('This email is already registered. Please sign in instead.');
       } else {
         setError(msg);
       }
