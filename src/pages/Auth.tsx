@@ -31,21 +31,50 @@ export const Auth = () => {
   const [mobileNumber, setMobileNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [signupStep, setSignupStep] = useState<1 | 2>(1);
+  const [signupStep, setSignupStep] = useState<1 | 2 | 3>(1);
+  const [showPreferences, setShowPreferences] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
+    // Check if user needs to see preferences
+    const checkUserPreferences = async (userId: string) => {
+      const { data } = await supabase
+        .from('user_preferences')
+        .select('id')
+        .eq('user_id', userId)
+        .limit(1);
+      
+      return data && data.length > 0;
+    };
+
     // Listen for auth changes FIRST, then check existing session
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
-        navigate('/');
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        // Check if user has set preferences
+        const hasPreferences = await checkUserPreferences(session.user.id);
+        
+        if (!hasPreferences) {
+          // Show preferences step
+          setShowPreferences(true);
+          setSignupStep(3);
+        } else {
+          // User has preferences, go to home
+          navigate('/');
+        }
       }
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        navigate('/');
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        const hasPreferences = await checkUserPreferences(session.user.id);
+        
+        if (!hasPreferences) {
+          setShowPreferences(true);
+          setSignupStep(3);
+        } else {
+          navigate('/');
+        }
       }
     });
 
@@ -82,7 +111,7 @@ export const Auth = () => {
 
       toast({
         title: "Confirm your email",
-        description: "We sent you a confirmation link. After confirming, continue to preferences.",
+        description: "Check your inbox and verify your email to continue.",
       });
 
       setSignupStep(2);
@@ -172,23 +201,15 @@ export const Auth = () => {
     }
   };
 
-  // Check URL for preferences step
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('step') === 'preferences') {
-      setSignupStep(2);
-    }
-  }, []);
-
-  // Show preferences step if user just signed up
-  if (signupStep === 2) {
+  // Show preferences step after email verification or social login
+  if (showPreferences || signupStep === 3) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-5xl space-y-6">
           <div className="text-center">
-            <Button variant="ghost" size="sm" onClick={() => setSignupStep(1)} className="absolute top-4 left-4">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="absolute top-4 left-4">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
+              Skip to Home
             </Button>
             
             <div className="flex items-center justify-center gap-2 mb-4">
@@ -202,6 +223,60 @@ export const Auth = () => {
           <Card className="border-border bg-card">
             <CardContent className="pt-6">
               <PreferencesStep />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Show email verification waiting message
+  if (signupStep === 2) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-md space-y-6">
+          <Button variant="ghost" size="sm" onClick={() => setSignupStep(1)} className="absolute top-4 left-4">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Login
+          </Button>
+
+          <div className="text-center space-y-4">
+            <div className="flex items-center justify-center gap-2">
+              <Film className="h-8 w-8 text-primary" />
+              <span className="text-2xl font-bold bg-hero-gradient bg-clip-text text-transparent">
+                BingeGuide
+              </span>
+            </div>
+          </div>
+
+          <Card className="border-border bg-card">
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-2xl text-center">Verify Your Email</CardTitle>
+              <CardDescription className="text-center">
+                We've sent a verification link to your email
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Please check your inbox and click the verification link to activate your account.
+                  After verification, you'll be redirected to set up your preferences.
+                </AlertDescription>
+              </Alert>
+
+              <div className="space-y-2 text-sm text-muted-foreground text-center">
+                <p>Didn't receive the email?</p>
+                <Button
+                  variant="outline"
+                  onClick={handleResendConfirmation}
+                  disabled={isLoading}
+                  className="w-full"
+                >
+                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Resend Verification Email
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
