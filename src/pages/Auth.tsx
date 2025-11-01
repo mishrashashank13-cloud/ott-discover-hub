@@ -11,7 +11,19 @@ import { Film, ArrowLeft, AlertCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import { PreferencesStep } from '@/components/PreferencesStep';
+import { z } from 'zod';
 
+const signupSchema = z.object({
+  username: z.string().trim().min(3, 'Username must be at least 3 characters').max(30, 'Username too long').regex(/^[a-zA-Z0-9_]+$/, 'Use letters, numbers, underscore only'),
+  mobileNumber: z.string().trim().min(7, 'Mobile number too short').max(20, 'Mobile number too long'),
+  email: z.string().trim().email('Invalid email').max(255, 'Email too long'),
+  password: z.string().min(6, 'Password must be at least 6 characters').max(128, 'Password too long'),
+});
+
+const signInSchema = z.object({
+  email: z.string().trim().email('Invalid email').max(255, 'Email too long'),
+  password: z.string().min(6, 'Password must be at least 6 characters').max(128, 'Password too long'),
+});
 export const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,14 +36,20 @@ export const Auth = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check if user is already logged in
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+    // Listen for auth changes FIRST, then check existing session
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) {
         navigate('/');
       }
-    };
-    checkUser();
+    });
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        navigate('/');
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, [navigate]);
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -39,9 +57,15 @@ export const Auth = () => {
     setIsLoading(true);
     setError('');
 
+    const result = signupSchema.safeParse({ username, mobileNumber, email, password });
+    if (!result.success) {
+      setError(result.error.issues[0]?.message ?? 'Please check your inputs');
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      const redirectUrl = `${window.location.origin}/`;
-      
+      const redirectUrl = `${window.location.origin}/auth?step=preferences`;
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -57,15 +81,14 @@ export const Auth = () => {
       if (error) throw error;
 
       toast({
-        title: "Account created!",
-        description: "Now let's set up your preferences.",
+        title: "Confirm your email",
+        description: "We sent you a confirmation link. After confirming, continue to preferences.",
       });
 
-      // Move to step 2
       setSignupStep(2);
     } catch (error: any) {
       const msg = String(error?.message ?? 'Sign up failed');
-      if (msg.toLowerCase().includes('profiles_username_key') || msg.toLowerCase().includes('duplicate key value')) {
+      if (msg.toLowerCase().includes('username') && msg.toLowerCase().includes('duplicate')) {
         setError('Username already taken. Please choose another.');
       } else {
         setError(msg);
@@ -79,6 +102,13 @@ export const Auth = () => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
+
+    const result = signInSchema.safeParse({ email, password });
+    if (!result.success) {
+      setError(result.error.issues[0]?.message ?? 'Please check your inputs');
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const { error } = await supabase.auth.signInWithPassword({
@@ -115,6 +145,29 @@ export const Auth = () => {
       if (error) throw error;
     } catch (error: any) {
       setError(error.message);
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    if (!email) {
+      setError('Enter your email first to resend the confirmation.');
+      return;
+    }
+    setIsLoading(true);
+    setError('');
+    try {
+      const redirectUrl = `${window.location.origin}/auth?step=preferences`;
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+        options: { emailRedirectTo: redirectUrl }
+      });
+      if (error) throw error;
+      toast({ title: 'Email sent', description: 'Check your inbox for the confirmation link.' });
+    } catch (error: any) {
+      setError(error.message ?? 'Failed to resend confirmation');
+    } finally {
       setIsLoading(false);
     }
   };
@@ -355,6 +408,17 @@ export const Auth = () => {
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Create Account
                   </Button>
+
+                  <div className="text-center">
+                    <Button
+                      type="button"
+                      variant="link"
+                      onClick={handleResendConfirmation}
+                      disabled={isLoading || !email}
+                    >
+                      Didn't get the email? Resend confirmation
+                    </Button>
+                  </div>
                 </form>
 
                 <div className="relative my-4">
