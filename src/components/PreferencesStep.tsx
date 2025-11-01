@@ -150,7 +150,7 @@ export const PreferencesStep = () => {
           content_type: 'Classics',
           content_title: item?.title || '',
           poster_path: item?.poster_url || null,
-          reaction: 'Like',
+          reaction: 'like',
         };
       });
 
