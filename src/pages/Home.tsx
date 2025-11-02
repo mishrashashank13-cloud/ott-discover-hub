@@ -131,19 +131,15 @@ export const Home = () => {
   }, [upcomingTVShows]);
 
   const LoadingCarousel = () => (
-    <Carousel>
-      <CarouselContent>
-        {Array.from({ length: 8 }).map((_, i) => (
-          <CarouselItem key={i} className="basis-1/2 md:basis-1/3 lg:basis-1/5">
-            <div className="space-y-2">
-              <Skeleton className="aspect-[2/3] w-full rounded-lg" />
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-3 w-2/3" />
-            </div>
-          </CarouselItem>
-        ))}
-      </CarouselContent>
-    </Carousel>
+    <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-3">
+      {Array.from({ length: 16 }).map((_, i) => (
+        <div key={i} className="space-y-1.5">
+          <Skeleton className="aspect-[2/3] w-full rounded-lg" />
+          <Skeleton className="h-3 w-full" />
+          <Skeleton className="h-2 w-2/3" />
+        </div>
+      ))}
+    </div>
   );
 
   const SectionHeader = ({ icon: Icon, title, onViewMore }: { 
@@ -188,17 +184,11 @@ export const Home = () => {
               {recommendedMoviesLoading ? (
                 <LoadingCarousel />
               ) : (
-                <Carousel>
-                  <CarouselContent>
-                    {recommendedMovies?.results?.slice(0, 8).map((movie) => (
-                      <CarouselItem key={movie.id} className="basis-1/2 md:basis-1/3 lg:basis-1/5">
-                        <MovieCard item={movie} />
-                      </CarouselItem>
-                    ))}
-                  </CarouselContent>
-                  <CarouselPrevious />
-                  <CarouselNext />
-                </Carousel>
+                <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-3">
+                  {recommendedMovies?.results?.slice(0, 16).map((movie) => (
+                    <MovieCard key={movie.id} item={movie} />
+                  ))}
+                </div>
               )}
             </section>
 
@@ -211,17 +201,11 @@ export const Home = () => {
               {recommendedTVShowsLoading ? (
                 <LoadingCarousel />
               ) : (
-                <Carousel>
-                  <CarouselContent>
-                    {recommendedTVShows?.results?.slice(0, 8).map((show) => (
-                      <CarouselItem key={show.id} className="basis-1/2 md:basis-1/3 lg:basis-1/5">
-                        <MovieCard item={show} />
-                      </CarouselItem>
-                    ))}
-                  </CarouselContent>
-                  <CarouselPrevious />
-                  <CarouselNext />
-                </Carousel>
+                <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-3">
+                  {recommendedTVShows?.results?.slice(0, 16).map((show) => (
+                    <MovieCard key={show.id} item={show} />
+                  ))}
+                </div>
               )}
             </section>
           </>
@@ -275,17 +259,11 @@ export const Home = () => {
           ) : trendingMoviesLoading ? (
             <LoadingCarousel />
           ) : (
-            <Carousel>
-              <CarouselContent>
-                {trendingMovies?.results?.slice(0, 8).map((movie) => (
-                  <CarouselItem key={movie.id} className="basis-1/2 md:basis-1/3 lg:basis-1/5">
-                    <MovieCard item={movie} />
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-              <CarouselPrevious />
-              <CarouselNext />
-            </Carousel>
+            <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-3">
+              {trendingMovies?.results?.slice(0, 16).map((movie) => (
+                <MovieCard key={movie.id} item={movie} />
+              ))}
+            </div>
           )}
         </section>
 
@@ -301,17 +279,11 @@ export const Home = () => {
           ) : trendingTVLoading ? (
             <LoadingCarousel />
           ) : (
-            <Carousel>
-              <CarouselContent>
-                {trendingTVShows?.results?.slice(0, 8).map((show) => (
-                  <CarouselItem key={show.id} className="basis-1/2 md:basis-1/3 lg:basis-1/5">
-                    <MovieCard item={show} />
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-              <CarouselPrevious />
-              <CarouselNext />
-            </Carousel>
+            <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-3">
+              {trendingTVShows?.results?.slice(0, 16).map((show) => (
+                <MovieCard key={show.id} item={show} />
+              ))}
+            </div>
           )}
         </section>
 
@@ -329,17 +301,11 @@ export const Home = () => {
           ) : filteredUpcomingMovies.length === 0 ? (
             <ErrorAlert message="No upcoming movies found" />
           ) : (
-            <Carousel>
-              <CarouselContent>
-                {filteredUpcomingMovies.slice(0, 8).map((movie) => (
-                  <CarouselItem key={movie.id} className="basis-1/2 md:basis-1/3 lg:basis-1/5">
-                    <MovieCard item={movie} />
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-              <CarouselPrevious />
-              <CarouselNext />
-            </Carousel>
+            <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-3">
+              {filteredUpcomingMovies.slice(0, 16).map((movie) => (
+                <MovieCard key={movie.id} item={movie} />
+              ))}
+            </div>
           )}
         </section>
 
@@ -357,17 +323,11 @@ export const Home = () => {
           ) : filteredUpcomingTVShows.length === 0 ? (
             <ErrorAlert message="No upcoming web series found" />
           ) : (
-            <Carousel>
-              <CarouselContent>
-                {filteredUpcomingTVShows.slice(0, 8).map((show) => (
-                  <CarouselItem key={show.id} className="basis-1/2 md:basis-1/3 lg:basis-1/5">
-                    <MovieCard item={show} />
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-              <CarouselPrevious />
-              <CarouselNext />
-            </Carousel>
+            <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-3">
+              {filteredUpcomingTVShows.slice(0, 16).map((show) => (
+                <MovieCard key={show.id} item={show} />
+              ))}
+            </div>
           )}
         </section>
       </div>

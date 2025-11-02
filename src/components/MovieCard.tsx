@@ -36,27 +36,24 @@ export const MovieCard = ({ item, className }: MovieCardProps) => {
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
         
         {/* Rating badge */}
-        <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/70 backdrop-blur-sm rounded-lg px-2 py-1">
-          <Star className="h-3 w-3 fill-rating-gold text-rating-gold" />
-          <span className="text-xs font-medium text-foreground">
+        <div className="absolute top-1.5 right-1.5 flex items-center gap-0.5 bg-black/70 backdrop-blur-sm rounded-md px-1.5 py-0.5">
+          <Star className="h-2.5 w-2.5 fill-rating-gold text-rating-gold" />
+          <span className="text-[10px] font-medium text-foreground">
             {item.vote_average.toFixed(1)}
           </span>
         </div>
 
         {/* Media type badge */}
-        <div className="absolute top-2 left-2">
-          <Badge variant="secondary" className="text-xs">
+        <div className="absolute top-1.5 left-1.5">
+          <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
             {isMovie(item) ? 'Movie' : 'TV Show'}
           </Badge>
         </div>
       </div>
 
-      <div className="p-4">
-        <h3 className="font-semibold text-foreground line-clamp-1 mb-1">{title}</h3>
-        <p className="text-sm text-muted-foreground mb-2">{year}</p>
-        <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed mb-3">
-          {item.overview}
-        </p>
+      <div className="p-2">
+        <h3 className="font-semibold text-xs text-foreground line-clamp-1 mb-0.5">{title}</h3>
+        <p className="text-[10px] text-muted-foreground mb-1.5">{year}</p>
         <RemindMeButton
           contentId={item.id.toString()}
           contentTitle={title}
@@ -64,7 +61,7 @@ export const MovieCard = ({ item, className }: MovieCardProps) => {
           releaseDate={releaseDate}
           variant="outline"
           size="sm"
-          className="w-full"
+          className="w-full text-[10px] h-6"
         />
       </div>
     </Card>
