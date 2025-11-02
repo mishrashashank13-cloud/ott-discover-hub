@@ -237,9 +237,17 @@ def _notify_via_edge(email: str | None, phone: str | None, message: dict):
     # or call a separate edge function responsible for notifications.
     if not email and not phone:
         raise RuntimeError("No contact methods")
+    # Retrieve Gmail credentials from environment variables for security
+    sender_email = os.getenv("GMAIL_SENDER_EMAIL")
+    sender_password = os.getenv("GMAIL_APP_PASSWORD")
+    
+    if not sender_email or not sender_password:
+        logger.error("Gmail credentials not configured in environment variables")
+        raise RuntimeError("Email credentials not configured")
+    
     send_email(
-        sender_email="mishra.shashank13@gmail.com",
-        sender_password="roqchldhhnwxejqi",
+        sender_email=sender_email,
+        sender_password=sender_password,
         receiver_email=email,
         subject=message.get("subject"),
         body=message.get("bodyText"))
