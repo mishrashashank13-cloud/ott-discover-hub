@@ -36,8 +36,20 @@ export const LikeDislikeButtons = ({
 
   // Check authentication status and fetch existing preference on component mount
   useEffect(() => {
+    let isMounted = true;
+
     const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      console.log("[LikeDislikeButtons] Checking auth for content:", contentId);
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error("[LikeDislikeButtons] Auth error:", error);
+      }
+      
+      console.log("[LikeDislikeButtons] Session:", session?.user?.id || "No user");
+      
+      if (!isMounted) return;
+      
       setUserId(session?.user?.id || null);
 
       // If user is logged in, fetch their existing preference for this content
@@ -51,6 +63,9 @@ export const LikeDislikeButtons = ({
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log("[LikeDislikeButtons] Auth state changed:", event, session?.user?.id);
+        if (!isMounted) return;
+        
         setUserId(session?.user?.id || null);
         if (session?.user?.id) {
           await fetchUserPreference(session.user.id);
@@ -60,7 +75,10 @@ export const LikeDislikeButtons = ({
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, [contentId]);
 
   /**
