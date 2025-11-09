@@ -223,6 +223,30 @@ export const Auth = () => {
     }
   };
 
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setError('Enter your email first to reset password.');
+      return;
+    }
+    setIsLoading(true);
+    setError('');
+    try {
+      const redirectUrl = `${window.location.origin}/auth`;
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: redirectUrl,
+      });
+      if (error) throw error;
+      toast({ 
+        title: 'Password reset email sent', 
+        description: 'Check your inbox for the password reset link.' 
+      });
+    } catch (error: any) {
+      setError(error.message ?? 'Failed to send password reset email');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Show preferences step after email verification or social login
   if (showPreferences || signupStep === 3) {
     return (
@@ -359,7 +383,19 @@ export const Auth = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="signin-password">Password</Label>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="signin-password">Password</Label>
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        onClick={handleForgotPassword}
+                        disabled={isLoading || !email}
+                        className="h-auto p-0 text-xs"
+                      >
+                        Forgot password?
+                      </Button>
+                    </div>
                     <Input
                       id="signin-password"
                       type="password"
