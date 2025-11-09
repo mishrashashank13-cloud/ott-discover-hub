@@ -3,9 +3,28 @@ import { Button } from "@/components/ui/button";
 import { SearchBarCompact } from "@/components/SearchBarCompact";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { Home, Search, Film, Globe, User, LogOut, LayoutDashboard } from "lucide-react";
+import { Home, Search, Film, Globe, User, LogOut, LayoutDashboard, Settings, History, Heart, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export const Navigation = () => {
   const location = useLocation();
@@ -13,22 +32,53 @@ export const Navigation = () => {
   const { toast } = useToast();
   const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   useEffect(() => {
     // Listen first to avoid missing events
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
       setIsLoading(false);
+      
+      // Fetch profile data when user logs in
+      if (session?.user) {
+        setTimeout(() => {
+          fetchUserProfile(session.user.id);
+        }, 0);
+      } else {
+        setUserProfile(null);
+      }
     });
 
     // Then get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setIsLoading(false);
+      
+      if (session?.user) {
+        fetchUserProfile(session.user.id);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('username, email')
+        .eq('user_id', userId)
+        .single();
+      
+      if (!error && data) {
+        setUserProfile(data);
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+    }
+  };
 
   const handleSignOut = async () => {
     try {
@@ -45,6 +95,61 @@ export const Navigation = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const handleDeleteAccount = async () => {
+    try {
+      // Delete user's data from profiles, reminders, and preferences
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('user_id', user?.id);
+
+      const { error: remindersError } = await supabase
+        .from('reminders')
+        .delete()
+        .eq('user_id', user?.id);
+
+      const { error: preferencesError } = await supabase
+        .from('user_preferences')
+        .delete()
+        .eq('user_id', user?.id);
+
+      if (profileError || remindersError || preferencesError) {
+        throw new Error('Failed to delete user data');
+      }
+
+      // Sign out the user
+      await supabase.auth.signOut();
+
+      toast({
+        title: "Account deleted",
+        description: "Your account and all data have been permanently deleted.",
+      });
+      
+      setShowDeleteDialog(false);
+      navigate('/');
+    } catch (error) {
+      console.error('Error deleting account:', error);
+      toast({
+        title: "Error deleting account",
+        description: "Please try again or contact support.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const getUserInitials = () => {
+    if (userProfile?.username) {
+      return userProfile.username.slice(0, 2).toUpperCase();
+    }
+    if (userProfile?.email) {
+      return userProfile.email.slice(0, 2).toUpperCase();
+    }
+    if (user?.email) {
+      return user.email.slice(0, 2).toUpperCase();
+    }
+    return 'U';
   };
 
   const isActive = (path: string) => {
@@ -124,15 +229,54 @@ export const Navigation = () => {
                   </Link>
                 </Button>
               ) : user ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleSignOut}
-                  className="flex items-center gap-2"
-                >
-                  <LogOut className="h-4 w-4" />
-                  <span className="hidden sm:inline">Logout</span>
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                      <Avatar className="h-10 w-10">
+                        <AvatarFallback className="bg-primary text-primary-foreground">
+                          {getUserInitials()}
+                        </AvatarFallback>
+                      </Avatar>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56" align="end" forceMount>
+                    <DropdownMenuLabel className="font-normal">
+                      <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-medium leading-none">
+                          {userProfile?.username || 'User'}
+                        </p>
+                        <p className="text-xs leading-none text-muted-foreground">
+                          {userProfile?.email || user?.email}
+                        </p>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => navigate('/dashboard')}>
+                      <LayoutDashboard className="mr-2 h-4 w-4" />
+                      <span>Dashboard</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/dashboard')}>
+                      <History className="mr-2 h-4 w-4" />
+                      <span>History</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/dashboard')}>
+                      <Heart className="mr-2 h-4 w-4" />
+                      <span>Preferences</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleSignOut}>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Logout</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => setShowDeleteDialog(true)}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      <span>Delete Account</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               ) : null}
             </div>
 
@@ -154,6 +298,28 @@ export const Navigation = () => {
           </div>
         </div>
       </div>
+
+      {/* Delete Account Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete your account
+              and remove all your data including reminders, preferences, and profile information.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteAccount}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete Account
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </nav>
   );
 };
