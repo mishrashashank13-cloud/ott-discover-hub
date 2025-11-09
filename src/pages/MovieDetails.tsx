@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { tmdbApi, getImageUrl } from "@/lib/tmdb";
 import { MovieCard } from "@/components/MovieCard";
 import { RemindMeButton } from "@/components/RemindMeButton";
+import { LikeDislikeButtons } from "@/components/LikeDislikeButtons";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -293,8 +294,15 @@ export const MovieDetails = () => {
               </div>
             )}
 
-            {/* Remind Me Button */}
-            <div className="flex gap-4">
+            {/* Like/Dislike and Remind Me Buttons */}
+            <div className="space-y-4">
+              <LikeDislikeButtons
+                contentId={movie.id.toString()}
+                contentTitle={movie.title}
+                contentType="movie"
+                posterPath={movie.poster_path}
+              />
+              
               <RemindMeButton
                 contentId={movie.id.toString()}
                 contentTitle={movie.title}
@@ -302,6 +310,7 @@ export const MovieDetails = () => {
                 releaseDate={movie.release_date}
                 variant="default"
                 size="lg"
+                className="w-full"
               />
             </div>
 
