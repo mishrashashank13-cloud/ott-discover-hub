@@ -259,7 +259,7 @@ export const Navigation = () => {
                       <History className="mr-2 h-4 w-4" />
                       <span>History</span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => navigate('/dashboard')}>
+                    <DropdownMenuItem onClick={() => navigate('/preferences')}>
                       <Heart className="mr-2 h-4 w-4" />
                       <span>Preferences</span>
                     </DropdownMenuItem>
