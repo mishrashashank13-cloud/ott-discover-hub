@@ -1,6 +1,8 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { tmdbApi, getImageUrl } from "@/lib/tmdb";
+import { supabase } from "@/integrations/supabase/client";
+import { useEffect } from "react";
 import { MovieCard } from "@/components/MovieCard";
 import { RemindMeButton } from "@/components/RemindMeButton";
 import { LikeDislikeButtons } from "@/components/LikeDislikeButtons";
@@ -63,6 +65,31 @@ export const MovieDetails = () => {
     queryFn: () => tmdbApi.getMovieWatchProviders(movieId),
     enabled: !!movieId,
   });
+
+  // Capture browsing history when user views the movie
+  useEffect(() => {
+    const captureHistory = async () => {
+      if (!movie) return;
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      try {
+        await supabase.from("browsing_history").insert({
+          user_id: session.user.id,
+          content_id: movie.id.toString(),
+          content_type: "movie",
+          content_title: movie.title,
+          poster_path: movie.poster_path,
+          viewed_at: new Date().toISOString(),
+        });
+      } catch (error) {
+        console.error("Error capturing browsing history:", error);
+      }
+    };
+
+    captureHistory();
+  }, [movie]);
 
   if (movieError || creditsError) {
     return (

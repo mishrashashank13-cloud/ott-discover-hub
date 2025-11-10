@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      browsing_history: {
+        Row: {
+          content_id: string
+          content_title: string | null
+          content_type: string
+          created_at: string
+          id: string
+          poster_path: string | null
+          user_id: string
+          viewed_at: string
+        }
+        Insert: {
+          content_id: string
+          content_title?: string | null
+          content_type: string
+          created_at?: string
+          id?: string
+          poster_path?: string | null
+          user_id: string
+          viewed_at?: string
+        }
+        Update: {
+          content_id?: string
+          content_title?: string | null
+          content_type?: string
+          created_at?: string
+          id?: string
+          poster_path?: string | null
+          user_id?: string
+          viewed_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string

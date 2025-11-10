@@ -1,6 +1,8 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { tmdbApi, getImageUrl } from "@/lib/tmdb";
+import { supabase } from "@/integrations/supabase/client";
+import { useEffect } from "react";
 import { MovieCard } from "@/components/MovieCard";
 import { RemindMeButton } from "@/components/RemindMeButton";
 import { LikeDislikeButtons } from "@/components/LikeDislikeButtons";
@@ -62,6 +64,31 @@ export const TVShowDetails = () => {
     queryFn: () => tmdbApi.getTVWatchProviders(showId),
     enabled: !!showId,
   });
+
+  // Capture browsing history when user views the TV show
+  useEffect(() => {
+    const captureHistory = async () => {
+      if (!show) return;
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      try {
+        await supabase.from("browsing_history").insert({
+          user_id: session.user.id,
+          content_id: show.id.toString(),
+          content_type: "tv",
+          content_title: show.name,
+          poster_path: show.poster_path,
+          viewed_at: new Date().toISOString(),
+        });
+      } catch (error) {
+        console.error("Error capturing browsing history:", error);
+      }
+    };
+
+    captureHistory();
+  }, [show]);
 
   if (showError || creditsError) {
     return (

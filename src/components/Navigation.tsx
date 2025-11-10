@@ -255,7 +255,7 @@ export const Navigation = () => {
                       <LayoutDashboard className="mr-2 h-4 w-4" />
                       <span>Dashboard</span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => navigate('/dashboard')}>
+                    <DropdownMenuItem onClick={() => navigate('/history')}>
                       <History className="mr-2 h-4 w-4" />
                       <span>History</span>
                     </DropdownMenuItem>
