@@ -11,6 +11,7 @@ import { Film, ArrowLeft, AlertCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import { PreferencesStep } from '@/components/PreferencesStep';
+import { RankingStep } from '@/components/RankingStep';
 import { z } from 'zod';
 
 const signupSchema = z.object({
@@ -31,35 +32,60 @@ export const Auth = () => {
   const [mobileNumber, setMobileNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [signupStep, setSignupStep] = useState<1 | 2 | 3>(1);
+  const [signupStep, setSignupStep] = useState<1 | 2 | 3 | 4>(1);
+  const [showRanking, setShowRanking] = useState(false);
   const [showPreferences, setShowPreferences] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check if user needs to see preferences
-    const checkUserPreferences = async (userId: string) => {
-      const { data } = await supabase
+    // Check if user needs to see ranking/preferences
+    const checkUserStatus = async (userId: string) => {
+      // Check if user has set language/genre rankings
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('language_preferences, genre_preferences, user_id')
+        .eq('user_id', userId)
+        .single();
+      
+      const hasRankings = profile?.language_preferences && 
+                         profile?.genre_preferences &&
+                         Array.isArray(profile.language_preferences) &&
+                         Array.isArray(profile.genre_preferences) &&
+                         profile.language_preferences.length > 0 &&
+                         profile.genre_preferences.length > 0;
+      
+      // Check if user has set content preferences
+      const { data: preferences } = await supabase
         .from('user_preferences')
         .select('id')
         .eq('user_id', userId)
         .limit(1);
       
-      return data && data.length > 0;
+      const hasPreferences = preferences && preferences.length > 0;
+      
+      return { hasRankings, hasPreferences };
     };
 
     // Listen for auth changes FIRST, then check existing session
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
-        // Check if user has set preferences
-        const hasPreferences = await checkUserPreferences(session.user.id);
+        // Store user ID for ranking step
+        setUserId(session.user.id);
         
-        if (!hasPreferences) {
-          // Show preferences step
-          setShowPreferences(true);
+        const { hasRankings, hasPreferences } = await checkUserStatus(session.user.id);
+        
+        if (!hasRankings) {
+          // Show ranking step first
+          setShowRanking(true);
           setSignupStep(3);
+        } else if (!hasPreferences) {
+          // Show preferences step after ranking
+          setShowPreferences(true);
+          setSignupStep(4);
         } else {
-          // User has preferences, go to home
+          // User has completed everything, go to home
           navigate('/');
         }
       }
@@ -67,11 +93,17 @@ export const Auth = () => {
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
-        const hasPreferences = await checkUserPreferences(session.user.id);
+        // Store user ID for ranking step
+        setUserId(session.user.id);
         
-        if (!hasPreferences) {
-          setShowPreferences(true);
+        const { hasRankings, hasPreferences } = await checkUserStatus(session.user.id);
+        
+        if (!hasRankings) {
+          setShowRanking(true);
           setSignupStep(3);
+        } else if (!hasPreferences) {
+          setShowPreferences(true);
+          setSignupStep(4);
         } else {
           navigate('/');
         }
@@ -247,8 +279,22 @@ export const Auth = () => {
     }
   };
 
-  // Show preferences step after email verification or social login
-  if (showPreferences || signupStep === 3) {
+  // Show ranking step after email verification
+  if (showRanking || signupStep === 3) {
+    return (
+      <RankingStep 
+        userId={userId}
+        onComplete={() => {
+          setShowRanking(false);
+          setShowPreferences(true);
+          setSignupStep(4);
+        }}
+      />
+    );
+  }
+
+  // Show content preferences step after ranking
+  if (showPreferences || signupStep === 4) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-5xl space-y-6">
