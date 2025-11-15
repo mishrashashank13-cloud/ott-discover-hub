@@ -92,8 +92,7 @@ export const Dashboard = () => {
         .from('browsing_history')
         .select('*')
         .eq('user_id', uid)
-        .order('viewed_at', { ascending: false })
-        .limit(20);
+        .order('viewed_at', { ascending: false });
 
       if (error) throw error;
 
