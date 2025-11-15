@@ -78,6 +78,7 @@ export interface DiscoverFilters {
   watch_region?: string;
 }
 
+// Helper function to fetch a single page from TMDB API
 const tmdbFetch = async (endpoint: string, region?: string) => {
   const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
   url.searchParams.append('api_key', TMDB_API_KEY);
@@ -92,17 +93,46 @@ const tmdbFetch = async (endpoint: string, region?: string) => {
   return response.json();
 };
 
+// Helper function to fetch multiple pages and combine results (fetches up to 5 pages = 100 items)
+const tmdbFetchMultiPage = async (endpoint: string, region?: string, maxPages: number = 5) => {
+  const allResults: any[] = [];
+  
+  for (let page = 1; page <= maxPages; page++) {
+    const separator = endpoint.includes('?') ? '&' : '?';
+    const url = new URL(`${TMDB_BASE_URL}${endpoint}${separator}page=${page}`);
+    url.searchParams.append('api_key', TMDB_API_KEY);
+    if (region) {
+      url.searchParams.append('region', region);
+    }
+    
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      throw new Error('Failed to fetch from TMDB');
+    }
+    
+    const data = await response.json();
+    allResults.push(...data.results);
+    
+    // Stop if we've reached the last page
+    if (page >= data.total_pages || data.results.length === 0) {
+      break;
+    }
+  }
+  
+  return { results: allResults };
+};
+
 export const tmdbApi = {
   getTrendingMovies: async (): Promise<{ results: Movie[] }> => {
-    return tmdbFetch('/trending/movie/week', 'IN');
+    return tmdbFetchMultiPage('/trending/movie/week', 'IN');
   },
 
   getTrendingTVShows: async (): Promise<{ results: TVShow[] }> => {
-    return tmdbFetch('/trending/tv/week', 'IN');
+    return tmdbFetchMultiPage('/trending/tv/week', 'IN');
   },
 
   getUpcomingMovies: async (): Promise<{ results: Movie[] }> => {
-    return tmdbFetch('/movie/upcoming', 'IN');
+    return tmdbFetchMultiPage('/movie/upcoming', 'IN');
   },
 
   getUpcomingTVShows: async (): Promise<{ results: TVShow[] }> => {
@@ -115,15 +145,15 @@ export const tmdbApi = {
     } catch (_) {}
     // Fallback to direct TMDB API
     const today = new Date().toISOString().slice(0, 10);
-    return tmdbFetch(`/discover/tv?first_air_date.gte=${today}&sort_by=first_air_date.asc&include_adult=false&watch_region=IN`);
+    return tmdbFetchMultiPage(`/discover/tv?first_air_date.gte=${today}&sort_by=first_air_date.asc&include_adult=false&watch_region=IN`);
   },
 
   getPopularMovies: async (): Promise<{ results: Movie[] }> => {
-    return tmdbFetch('/movie/popular', 'IN');
+    return tmdbFetchMultiPage('/movie/popular', 'IN');
   },
 
   getPopularTVShows: async (): Promise<{ results: TVShow[] }> => {
-    return tmdbFetch('/tv/popular', 'IN');
+    return tmdbFetchMultiPage('/tv/popular', 'IN');
   },
 
   getTrending: async (): Promise<{ results: (Movie | TVShow)[] }> => {
@@ -153,12 +183,12 @@ export const tmdbApi = {
 
   getMoviesByGenre: async (genreIds: number[]): Promise<{ results: Movie[] }> => {
     const genres = genreIds.join(',');
-    return tmdbFetch(`/discover/movie?with_genres=${genres}&sort_by=popularity.desc`, 'IN');
+    return tmdbFetchMultiPage(`/discover/movie?with_genres=${genres}&sort_by=popularity.desc`, 'IN');
   },
 
   getTVShowsByGenre: async (genreIds: number[]): Promise<{ results: TVShow[] }> => {
     const genres = genreIds.join(',');
-    return tmdbFetch(`/discover/tv?with_genres=${genres}&sort_by=popularity.desc`, 'IN');
+    return tmdbFetchMultiPage(`/discover/tv?with_genres=${genres}&sort_by=popularity.desc`, 'IN');
   },
 
   getMovieGenres: async (): Promise<{ genres: Genre[] }> => {
@@ -181,7 +211,7 @@ export const tmdbApi = {
     if (filters.primary_release_year) params.append('primary_release_year', filters.primary_release_year.toString());
     if (filters.watch_region) params.append('watch_region', filters.watch_region);
     params.append('sort_by', 'popularity.desc');
-    return tmdbFetch(`/discover/movie?${params.toString()}`);
+    return tmdbFetchMultiPage(`/discover/movie?${params.toString()}`);
   },
 
   discoverTVShows: async (filters: DiscoverFilters): Promise<{ results: TVShow[] }> => {
@@ -192,7 +222,7 @@ export const tmdbApi = {
     if (filters.first_air_date_year) params.append('first_air_date_year', filters.first_air_date_year.toString());
     if (filters.watch_region) params.append('watch_region', filters.watch_region);
     params.append('sort_by', 'popularity.desc');
-    return tmdbFetch(`/discover/tv?${params.toString()}`);
+    return tmdbFetchMultiPage(`/discover/tv?${params.toString()}`);
   },
 
   getMovieWatchProviders: async (id: number, region: string = 'IN') => {
@@ -207,24 +237,24 @@ export const tmdbApi = {
   getOTTMovies: async (sortBy: 'popularity.desc' | 'vote_average.desc' = 'popularity.desc'): Promise<{ results: Movie[] }> => {
     // Popular OTT providers in India: Netflix (8), Prime Video (119), Disney+ Hotstar (122), etc.
     const ottProviders = '8|119|122|337|463|531'; // Netflix, Prime, Hotstar, Disney+, Jio Cinema, Zee5
-    return tmdbFetch(`/discover/movie?with_watch_providers=${ottProviders}&watch_region=IN&sort_by=${sortBy}`);
+    return tmdbFetchMultiPage(`/discover/movie?with_watch_providers=${ottProviders}&watch_region=IN&sort_by=${sortBy}`);
   },
 
   getOTTTVShows: async (sortBy: 'popularity.desc' | 'vote_average.desc' = 'popularity.desc'): Promise<{ results: TVShow[] }> => {
     const ottProviders = '8|119|122|337|463|531';
-    return tmdbFetch(`/discover/tv?with_watch_providers=${ottProviders}&watch_region=IN&sort_by=${sortBy}`);
+    return tmdbFetchMultiPage(`/discover/tv?with_watch_providers=${ottProviders}&watch_region=IN&sort_by=${sortBy}`);
   },
 
   getUpcomingOTTMovies: async (): Promise<{ results: Movie[] }> => {
     const today = new Date().toISOString().slice(0, 10);
     const ottProviders = '8|119|122|337|463|531';
-    return tmdbFetch(`/discover/movie?with_watch_providers=${ottProviders}&watch_region=IN&primary_release_date.gte=${today}&sort_by=primary_release_date.asc`);
+    return tmdbFetchMultiPage(`/discover/movie?with_watch_providers=${ottProviders}&watch_region=IN&primary_release_date.gte=${today}&sort_by=primary_release_date.asc`);
   },
 
   getUpcomingOTTTVShows: async (): Promise<{ results: TVShow[] }> => {
     const today = new Date().toISOString().slice(0, 10);
     const ottProviders = '8|119|122|337|463|531';
-    return tmdbFetch(`/discover/tv?with_watch_providers=${ottProviders}&watch_region=IN&first_air_date.gte=${today}&sort_by=first_air_date.asc`);
+    return tmdbFetchMultiPage(`/discover/tv?with_watch_providers=${ottProviders}&watch_region=IN&first_air_date.gte=${today}&sort_by=first_air_date.asc`);
   },
 };
 
