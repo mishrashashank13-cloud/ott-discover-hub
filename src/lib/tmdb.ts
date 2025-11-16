@@ -14,6 +14,7 @@ export interface Movie {
   vote_average: number;
   vote_count: number;
   genre_ids: number[];
+  original_language: string;
 }
 
 export interface TVShow {
@@ -26,6 +27,7 @@ export interface TVShow {
   vote_average: number;
   vote_count: number;
   genre_ids: number[];
+  original_language: string;
 }
 
 export interface MovieDetails extends Movie {

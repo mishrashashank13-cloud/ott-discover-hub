@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { tmdbApi } from "@/lib/tmdb";
@@ -9,11 +9,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertCircle, Search as SearchIcon, TrendingUp, Film, Tv, Calendar } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { sortByUserPreferences, UserPreferences } from "@/lib/contentSorting";
 
 export const Search = () => {
   const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || "");
   const [mediaType, setMediaType] = useState<"movie" | "tv">("movie");
+  const [userPreferences, setUserPreferences] = useState<UserPreferences | null>(null);
   const [filters, setFilters] = useState<FilterOptions>({
     genres: [],
     platforms: [],
@@ -21,6 +24,29 @@ export const Search = () => {
     year: null,
   });
   const category = searchParams.get('category');
+
+  // Fetch user preferences for sorting
+  useEffect(() => {
+    const fetchUserPreferences = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('language_preferences, genre_preferences')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (profile) {
+          setUserPreferences({
+            language_preferences: (profile.language_preferences as any) || [],
+            genre_preferences: (profile.genre_preferences as any) || [],
+          });
+        }
+      }
+    };
+    
+    fetchUserPreferences();
+  }, []);
 
   useEffect(() => {
     const queryParam = searchParams.get('q');
@@ -131,7 +157,13 @@ export const Search = () => {
 
   const isLoading = category ? categoryLoading : (searchQuery ? searchLoading : filteredLoading);
   const error = category ? categoryError : (searchQuery ? searchError : filteredError);
-  const results = category ? categoryResults?.results : (searchQuery ? searchResults?.results : filteredResults?.results);
+  const rawResults = category ? categoryResults?.results : (searchQuery ? searchResults?.results : filteredResults?.results);
+  
+  // Sort results by user preferences
+  const results = useMemo(() => {
+    if (!rawResults) return rawResults;
+    return sortByUserPreferences(rawResults, userPreferences);
+  }, [rawResults, userPreferences]);
 
   return (
     <div className="min-h-screen bg-background">

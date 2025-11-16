@@ -9,19 +9,36 @@ import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState, useMemo } from "react";
+import { sortByUserPreferences, UserPreferences } from "@/lib/contentSorting";
 
 export const Home = () => {
   const navigate = useNavigate();
   const [userId, setUserId] = useState<string | null>(null);
   const [genreIds, setGenreIds] = useState<number[]>([]);
+  const [userPreferences, setUserPreferences] = useState<UserPreferences | null>(null);
   
+  // Fetch user data and preferences on component mount
   useEffect(() => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUserId(user.id);
         
-        // Fetch user preferences and extract genre IDs
+        // Fetch user's ranked language and genre preferences from profiles table
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('language_preferences, genre_preferences')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (profile) {
+          setUserPreferences({
+            language_preferences: (profile.language_preferences as any) || [],
+            genre_preferences: (profile.genre_preferences as any) || [],
+          });
+        }
+        
+        // Fetch user preferences and extract genre IDs for recommendations
         const { data: preferences } = await supabase
           .from('user_preferences')
           .select('content_id, content_type')
@@ -107,28 +124,55 @@ export const Home = () => {
     queryFn: tmdbApi.getUpcomingTVShows,
   });
 
-  // Filter to only show content with release dates after today
+  // Filter and sort upcoming movies by user preferences
   const filteredUpcomingMovies = useMemo(() => {
     if (!upcomingMovies?.results) return [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    return upcomingMovies.results.filter(movie => {
+    const filtered = upcomingMovies.results.filter(movie => {
       if (!movie.release_date) return false;
       const releaseDate = new Date(movie.release_date);
       return releaseDate > today;
     });
-  }, [upcomingMovies]);
+    return sortByUserPreferences(filtered, userPreferences);
+  }, [upcomingMovies, userPreferences]);
 
+  // Filter and sort upcoming TV shows by user preferences
   const filteredUpcomingTVShows = useMemo(() => {
     if (!upcomingTVShows?.results) return [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    return upcomingTVShows.results.filter(show => {
+    const filtered = upcomingTVShows.results.filter(show => {
       if (!show.first_air_date) return false;
       const airDate = new Date(show.first_air_date);
       return airDate > today;
     });
-  }, [upcomingTVShows]);
+    return sortByUserPreferences(filtered, userPreferences);
+  }, [upcomingTVShows, userPreferences]);
+
+  // Sort trending movies by user preferences
+  const sortedTrendingMovies = useMemo(() => {
+    if (!trendingMovies?.results) return [];
+    return sortByUserPreferences(trendingMovies.results, userPreferences);
+  }, [trendingMovies, userPreferences]);
+
+  // Sort trending TV shows by user preferences
+  const sortedTrendingTVShows = useMemo(() => {
+    if (!trendingTVShows?.results) return [];
+    return sortByUserPreferences(trendingTVShows.results, userPreferences);
+  }, [trendingTVShows, userPreferences]);
+
+  // Sort recommended movies by user preferences
+  const sortedRecommendedMovies = useMemo(() => {
+    if (!recommendedMovies?.results) return [];
+    return sortByUserPreferences(recommendedMovies.results, userPreferences);
+  }, [recommendedMovies, userPreferences]);
+
+  // Sort recommended TV shows by user preferences
+  const sortedRecommendedTVShows = useMemo(() => {
+    if (!recommendedTVShows?.results) return [];
+    return sortByUserPreferences(recommendedTVShows.results, userPreferences);
+  }, [recommendedTVShows, userPreferences]);
 
   const LoadingCarousel = () => (
     <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-3">
@@ -185,7 +229,7 @@ export const Home = () => {
                 <LoadingCarousel />
               ) : (
                 <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-3">
-                  {recommendedMovies?.results?.slice(0, 16).map((movie) => (
+                  {sortedRecommendedMovies?.slice(0, 16).map((movie) => (
                     <MovieCard key={movie.id} item={movie} />
                   ))}
                 </div>
@@ -202,7 +246,7 @@ export const Home = () => {
                 <LoadingCarousel />
               ) : (
                 <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-3">
-                  {recommendedTVShows?.results?.slice(0, 16).map((show) => (
+                  {sortedRecommendedTVShows?.slice(0, 16).map((show) => (
                     <MovieCard key={show.id} item={show} />
                   ))}
                 </div>
@@ -233,8 +277,8 @@ export const Home = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {[
-                ...(trendingMovies?.results?.slice(0, 2) || []),
-                ...(trendingTVShows?.results?.slice(0, 2) || [])
+                ...(sortedTrendingMovies?.slice(0, 2) || []),
+                ...(sortedTrendingTVShows?.slice(0, 2) || [])
               ].map((item) => (
                 <div key={item.id} className="group relative">
                   <MovieCard item={item} className="transform transition-transform duration-300 group-hover:scale-105" />
@@ -260,7 +304,7 @@ export const Home = () => {
             <LoadingCarousel />
           ) : (
             <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-3">
-              {trendingMovies?.results?.slice(0, 16).map((movie) => (
+              {sortedTrendingMovies?.slice(0, 16).map((movie) => (
                 <MovieCard key={movie.id} item={movie} />
               ))}
             </div>
@@ -280,7 +324,7 @@ export const Home = () => {
             <LoadingCarousel />
           ) : (
             <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-3">
-              {trendingTVShows?.results?.slice(0, 16).map((show) => (
+              {sortedTrendingTVShows?.slice(0, 16).map((show) => (
                 <MovieCard key={show.id} item={show} />
               ))}
             </div>
