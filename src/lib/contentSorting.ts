@@ -98,7 +98,7 @@ const calculatePreferenceScore = (
   // Check language preference match
   if (itemLanguage && preferences.language_preferences) {
     const langPreference = preferences.language_preferences.find(
-      (pref) => pref.name.toLowerCase() === itemLanguage.toLowerCase()
+      (pref) => pref.name?.toLowerCase() === itemLanguage.toLowerCase()
     );
     
     if (langPreference) {
@@ -118,7 +118,7 @@ const calculatePreferenceScore = (
 
     for (const itemGenre of itemGenres) {
       const genrePreference = preferences.genre_preferences.find(
-        (pref) => pref.name.toLowerCase() === itemGenre.toLowerCase()
+        (pref) => pref.name?.toLowerCase() === itemGenre.toLowerCase()
       );
 
       if (genrePreference) {
