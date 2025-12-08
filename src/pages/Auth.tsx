@@ -7,53 +7,41 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
-import { Film, ArrowLeft, AlertCircle, Loader2, Phone, Mail } from 'lucide-react';
+import { Film, ArrowLeft, AlertCircle, Loader2, Mail } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import { PreferencesStep } from '@/components/PreferencesStep';
 import { RankingStep } from '@/components/RankingStep';
-import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { z } from 'zod';
 
 // =============================================================================
 // VALIDATION SCHEMAS
 // Zod schemas for validating user input before submitting to Supabase
 // =============================================================================
-const mobileSchema = z.string().trim().min(10, 'Mobile number must be at least 10 digits').max(15, 'Mobile number too long').regex(/^\+?[0-9]+$/, 'Enter valid mobile number with country code');
-
-const emailSignInSchema = z.object({
-  email: z.string().trim().email('Invalid email').max(255, 'Email too long'),
-  password: z.string().min(6, 'Password must be at least 6 characters').max(128, 'Password too long'),
-});
+const emailSchema = z.string().trim().email('Invalid email address').max(255, 'Email too long');
 
 const signupSchema = z.object({
   username: z.string().trim().min(3, 'Username must be at least 3 characters').max(30, 'Username too long').regex(/^[a-zA-Z0-9_]+$/, 'Use letters, numbers, underscore only'),
-  mobileNumber: z.string().trim().min(10, 'Mobile number must be at least 10 digits').max(15, 'Mobile number too long').regex(/^\+?[0-9]+$/, 'Enter valid mobile number with country code'),
+  email: z.string().trim().email('Invalid email address').max(255, 'Email too long'),
 });
 
 // =============================================================================
 // AUTH COMPONENT
-// Handles user authentication with mobile OTP as primary, email/Google as alternatives
+// Handles user authentication with email magic link as primary, Google as alternative
 // =============================================================================
 export const Auth = () => {
   // Form state for user inputs
-  const [mobileNumber, setMobileNumber] = useState('');
-  const [otp, setOtp] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
   
   // UI state for loading, errors, and current step
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [signupStep, setSignupStep] = useState<1 | 2 | 3 | 4>(1);
   const [showRanking, setShowRanking] = useState(false);
   const [showPreferences, setShowPreferences] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
-  
-  // Alternative login method toggle: 'email' or 'google'
-  const [altLoginMethod, setAltLoginMethod] = useState<'email' | null>(null);
   
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -130,101 +118,65 @@ export const Auth = () => {
   }, [navigate]);
 
   // ===========================================================================
-  // MOBILE OTP HANDLERS
-  // Send OTP to mobile number for authentication
+  // EMAIL MAGIC LINK HANDLER (SIGN IN)
+  // Sends a passwordless magic link to the user's email for authentication
   // ===========================================================================
-  const handleSendOtp = async () => {
+  const handleSendMagicLink = async () => {
     setIsLoading(true);
     setError('');
 
-    // Validate mobile number format
-    const result = mobileSchema.safeParse(mobileNumber);
+    // Validate email format
+    const result = emailSchema.safeParse(email);
     if (!result.success) {
-      setError(result.error.issues[0]?.message ?? 'Invalid mobile number');
+      setError(result.error.issues[0]?.message ?? 'Invalid email address');
       setIsLoading(false);
       return;
     }
-
-    // Ensure mobile number starts with + for international format
-    const formattedNumber = mobileNumber.startsWith('+') ? mobileNumber : `+${mobileNumber}`;
 
     try {
       const { error } = await supabase.auth.signInWithOtp({
-        phone: formattedNumber,
+        email: email.trim(),
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth`,
+        },
       });
 
       if (error) throw error;
 
-      setOtpSent(true);
+      setMagicLinkSent(true);
       toast({
-        title: "OTP Sent",
-        description: `A verification code has been sent to ${formattedNumber}`,
+        title: "Magic Link Sent",
+        description: `Check your inbox at ${email} for the login link`,
       });
     } catch (error: any) {
-      setError(error.message ?? 'Failed to send OTP');
+      setError(error.message ?? 'Failed to send magic link');
     } finally {
       setIsLoading(false);
     }
   };
 
   // ===========================================================================
-  // VERIFY OTP HANDLER
-  // Verify the OTP entered by user to complete authentication
-  // ===========================================================================
-  const handleVerifyOtp = async () => {
-    if (otp.length !== 6) {
-      setError('Please enter the complete 6-digit OTP');
-      return;
-    }
-
-    setIsLoading(true);
-    setError('');
-
-    const formattedNumber = mobileNumber.startsWith('+') ? mobileNumber : `+${mobileNumber}`;
-
-    try {
-      const { error } = await supabase.auth.verifyOtp({
-        phone: formattedNumber,
-        token: otp,
-        type: 'sms',
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Welcome!",
-        description: "You have successfully signed in.",
-      });
-    } catch (error: any) {
-      setError(error.message ?? 'Invalid OTP');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // ===========================================================================
-  // SIGNUP WITH MOBILE OTP
-  // Creates new account with username and mobile number, sends OTP for verification
+  // EMAIL MAGIC LINK SIGNUP HANDLER
+  // Creates new account with username and email, sends magic link for verification
   // ===========================================================================
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
-    const result = signupSchema.safeParse({ username, mobileNumber });
+    const result = signupSchema.safeParse({ username, email });
     if (!result.success) {
       setError(result.error.issues[0]?.message ?? 'Please check your inputs');
       setIsLoading(false);
       return;
     }
 
-    const formattedNumber = mobileNumber.startsWith('+') ? mobileNumber : `+${mobileNumber}`;
-
     try {
-      // Sign up with phone and store username in user metadata
+      // Sign up with email magic link and store username in user metadata
       const { error } = await supabase.auth.signInWithOtp({
-        phone: formattedNumber,
+        email: email.trim(),
         options: {
+          emailRedirectTo: `${window.location.origin}/auth`,
           data: {
             username,
           },
@@ -233,50 +185,14 @@ export const Auth = () => {
 
       if (error) throw error;
 
-      setOtpSent(true);
+      setMagicLinkSent(true);
       setSignupStep(2);
       toast({
-        title: "OTP Sent",
-        description: `Verify your mobile number ${formattedNumber} to complete signup`,
+        title: "Magic Link Sent",
+        description: `Check your inbox at ${email} to complete signup`,
       });
     } catch (error: any) {
       setError(error.message ?? 'Sign up failed');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // ===========================================================================
-  // EMAIL SIGN IN HANDLER
-  // Alternative login method using email and password
-  // ===========================================================================
-  const handleEmailSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
-
-    const result = emailSignInSchema.safeParse({ email, password });
-    if (!result.success) {
-      setError(result.error.issues[0]?.message ?? 'Please check your inputs');
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Welcome back!",
-        description: "You have successfully signed in.",
-      });
-      navigate('/');
-    } catch (error: any) {
-      setError(error.message);
     } finally {
       setIsLoading(false);
     }
@@ -306,36 +222,8 @@ export const Auth = () => {
   };
 
   // ===========================================================================
-  // FORGOT PASSWORD HANDLER
-  // Sends password reset email to the user
-  // ===========================================================================
-  const handleForgotPassword = async () => {
-    if (!email) {
-      setError('Enter your email first to reset password.');
-      return;
-    }
-    setIsLoading(true);
-    setError('');
-    try {
-      const redirectUrl = `${window.location.origin}/auth`;
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: redirectUrl,
-      });
-      if (error) throw error;
-      toast({ 
-        title: 'Password reset email sent', 
-        description: 'Check your inbox for the password reset link.' 
-      });
-    } catch (error: any) {
-      setError(error.message ?? 'Failed to send password reset email');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // ===========================================================================
   // CONDITIONAL RENDERS
-  // Show ranking, preferences, or OTP verification screens based on signup step
+  // Show ranking, preferences, or magic link confirmation screens based on step
   // ===========================================================================
   
   // Show ranking step after successful authentication
@@ -381,13 +269,12 @@ export const Auth = () => {
     );
   }
 
-  // Show OTP verification screen after signup
-  if (signupStep === 2 && otpSent) {
-    const formattedNumber = mobileNumber.startsWith('+') ? mobileNumber : `+${mobileNumber}`;
+  // Show magic link sent confirmation screen
+  if (magicLinkSent) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-md space-y-6">
-          <Button variant="ghost" size="sm" onClick={() => { setSignupStep(1); setOtpSent(false); }} className="absolute top-4 left-4">
+          <Button variant="ghost" size="sm" onClick={() => { setMagicLinkSent(false); setError(''); }} className="absolute top-4 left-4">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
@@ -403,56 +290,43 @@ export const Auth = () => {
 
           <Card className="border-border bg-card">
             <CardHeader className="space-y-1">
-              <CardTitle className="text-2xl text-center">Verify Your Number</CardTitle>
+              <CardTitle className="text-2xl text-center">Check Your Email</CardTitle>
               <CardDescription className="text-center">
-                Enter the 6-digit code sent to {formattedNumber}
+                We've sent a magic link to <strong>{email}</strong>
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* OTP Input with 6 slots for verification code */}
-              <div className="flex justify-center">
-                <InputOTP
-                  maxLength={6}
-                  value={otp}
-                  onChange={(value) => setOtp(value)}
-                >
-                  <InputOTPGroup>
-                    <InputOTPSlot index={0} />
-                    <InputOTPSlot index={1} />
-                    <InputOTPSlot index={2} />
-                    <InputOTPSlot index={3} />
-                    <InputOTPSlot index={4} />
-                    <InputOTPSlot index={5} />
-                  </InputOTPGroup>
-                </InputOTP>
+              {/* Email icon illustration */}
+              <div className="flex justify-center py-6">
+                <div className="rounded-full bg-primary/10 p-6">
+                  <Mail className="h-12 w-12 text-primary" />
+                </div>
               </div>
 
-              {error && (
-                <Alert className="border-destructive/50 bg-destructive/10">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
+              <p className="text-center text-sm text-muted-foreground">
+                Click the link in the email to sign in. The link expires in 1 hour.
+              </p>
 
-              <Button 
-                onClick={handleVerifyOtp}
-                className="w-full" 
-                disabled={isLoading || otp.length !== 6}
-              >
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Verify & Continue
-              </Button>
-
-              <div className="text-center">
+              <div className="text-center pt-4">
                 <Button
                   type="button"
                   variant="link"
-                  onClick={handleSendOtp}
+                  onClick={handleSendMagicLink}
                   disabled={isLoading}
                 >
-                  Didn't receive the code? Resend OTP
+                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Didn't receive it? Resend magic link
                 </Button>
               </div>
+
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => { setMagicLinkSent(false); setEmail(''); setError(''); }}
+                className="w-full"
+              >
+                Use a different email
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -462,7 +336,7 @@ export const Auth = () => {
 
   // ===========================================================================
   // MAIN AUTH SCREEN
-  // Primary login with mobile OTP, alternative options for email and Google
+  // Primary login with email magic link, Google as alternative
   // ===========================================================================
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -492,7 +366,7 @@ export const Auth = () => {
           <CardHeader className="space-y-1">
             <CardTitle className="text-2xl text-center">Welcome</CardTitle>
             <CardDescription className="text-center">
-              Sign in with your mobile number or create a new account
+              Sign in with your email or create a new account
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -504,211 +378,73 @@ export const Auth = () => {
               
               {/* ============================================================= */}
               {/* SIGN IN TAB */}
-              {/* Primary: Mobile OTP, Alternatives: Email, Google */}
+              {/* Primary: Email Magic Link, Alternative: Google */}
               {/* ============================================================= */}
               <TabsContent value="signin" className="space-y-4">
-                {/* Primary Mobile OTP Login */}
-                {!altLoginMethod && !otpSent && (
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="signin-mobile">Mobile Number</Label>
-                      <Input
-                        id="signin-mobile"
-                        type="tel"
-                        placeholder="+91 9876543210"
-                        value={mobileNumber}
-                        onChange={(e) => setMobileNumber(e.target.value)}
-                        disabled={isLoading}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Include country code (e.g., +91 for India)
-                      </p>
-                    </div>
-                    
-                    {error && (
-                      <Alert className="border-destructive/50 bg-destructive/10">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>{error}</AlertDescription>
-                      </Alert>
-                    )}
-                    
-                    <Button 
-                      onClick={handleSendOtp}
-                      className="w-full" 
-                      disabled={isLoading || !mobileNumber}
-                    >
-                      {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      <Phone className="mr-2 h-4 w-4" />
-                      Send OTP
-                    </Button>
-                  </div>
-                )}
-
-                {/* OTP Verification after sending */}
-                {!altLoginMethod && otpSent && (
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Enter OTP</Label>
-                      <div className="flex justify-center">
-                        <InputOTP
-                          maxLength={6}
-                          value={otp}
-                          onChange={(value) => setOtp(value)}
-                        >
-                          <InputOTPGroup>
-                            <InputOTPSlot index={0} />
-                            <InputOTPSlot index={1} />
-                            <InputOTPSlot index={2} />
-                            <InputOTPSlot index={3} />
-                            <InputOTPSlot index={4} />
-                            <InputOTPSlot index={5} />
-                          </InputOTPGroup>
-                        </InputOTP>
-                      </div>
-                      <p className="text-xs text-muted-foreground text-center">
-                        Code sent to {mobileNumber.startsWith('+') ? mobileNumber : `+${mobileNumber}`}
-                      </p>
-                    </div>
-
-                    {error && (
-                      <Alert className="border-destructive/50 bg-destructive/10">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>{error}</AlertDescription>
-                      </Alert>
-                    )}
-
-                    <Button 
-                      onClick={handleVerifyOtp}
-                      className="w-full" 
-                      disabled={isLoading || otp.length !== 6}
-                    >
-                      {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Verify OTP
-                    </Button>
-
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => { setOtpSent(false); setOtp(''); setError(''); }}
-                      className="w-full"
-                    >
-                      Change Number
-                    </Button>
-                  </div>
-                )}
-
-                {/* Email Login Form (Alternative) */}
-                {altLoginMethod === 'email' && (
-                  <form onSubmit={handleEmailSignIn} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="signin-email">Email</Label>
-                      <Input
-                        id="signin-email"
-                        type="email"
-                        placeholder="Enter your email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                        disabled={isLoading}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="signin-password">Password</Label>
-                        <Button
-                          type="button"
-                          variant="link"
-                          size="sm"
-                          onClick={handleForgotPassword}
-                          disabled={isLoading || !email}
-                          className="h-auto p-0 text-xs"
-                        >
-                          Forgot password?
-                        </Button>
-                      </div>
-                      <Input
-                        id="signin-password"
-                        type="password"
-                        placeholder="Enter your password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        disabled={isLoading}
-                      />
-                    </div>
-                    
-                    {error && (
-                      <Alert className="border-destructive/50 bg-destructive/10">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>{error}</AlertDescription>
-                      </Alert>
-                    )}
-                    
-                    <Button 
-                      type="submit" 
-                      className="w-full" 
+                {/* Email Magic Link Login */}
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="signin-email">Email Address</Label>
+                    <Input
+                      id="signin-email"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       disabled={isLoading}
-                    >
-                      {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Sign In with Email
-                    </Button>
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      We'll send you a magic link to sign in - no password needed
+                    </p>
+                  </div>
+                  
+                  {error && (
+                    <Alert className="border-destructive/50 bg-destructive/10">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                  )}
+                  
+                  <Button 
+                    onClick={handleSendMagicLink}
+                    className="w-full" 
+                    disabled={isLoading || !email}
+                  >
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <Mail className="mr-2 h-4 w-4" />
+                    Send Magic Link
+                  </Button>
+                </div>
 
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => { setAltLoginMethod(null); setError(''); }}
-                      className="w-full"
-                    >
-                      Back to Mobile Login
-                    </Button>
-                  </form>
-                )}
+                {/* Separator and Google Login */}
+                <div className="relative my-4">
+                  <Separator />
+                  <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
+                    Or continue with
+                  </span>
+                </div>
 
-                {/* Separator and Alternative Login Options */}
-                {!altLoginMethod && !otpSent && (
-                  <>
-                    <div className="relative my-4">
-                      <Separator />
-                      <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
-                        Or continue with
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      {/* Email Login Button */}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setAltLoginMethod('email')}
-                        disabled={isLoading}
-                      >
-                        <Mail className="h-5 w-5 mr-2" />
-                        Email
-                      </Button>
-
-                      {/* Google Login Button */}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleGoogleLogin}
-                        disabled={isLoading}
-                      >
-                        <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24">
-                          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                        </svg>
-                        Google
-                      </Button>
-                    </div>
-                  </>
-                )}
+                {/* Google Login Button */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleGoogleLogin}
+                  disabled={isLoading}
+                  className="w-full"
+                >
+                  <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                  </svg>
+                  Continue with Google
+                </Button>
               </TabsContent>
               
               {/* ============================================================= */}
               {/* SIGN UP TAB */}
-              {/* Collects username and mobile number, sends OTP for verification */}
+              {/* Collects username and email, sends magic link for verification */}
               {/* ============================================================= */}
               <TabsContent value="signup" className="space-y-4">
                 <form onSubmit={handleSignUp} className="space-y-4">
@@ -727,18 +463,18 @@ export const Auth = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="signup-mobile">Mobile Number</Label>
+                    <Label htmlFor="signup-email">Email Address</Label>
                     <Input
-                      id="signup-mobile"
-                      type="tel"
-                      placeholder="+91 9876543210"
-                      value={mobileNumber}
-                      onChange={(e) => setMobileNumber(e.target.value)}
+                      id="signup-email"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       required
                       disabled={isLoading}
                     />
                     <p className="text-xs text-muted-foreground">
-                      Include country code (e.g., +91 for India)
+                      We'll send you a magic link to verify your email
                     </p>
                   </div>
                   
@@ -755,8 +491,8 @@ export const Auth = () => {
                     disabled={isLoading}
                   >
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    <Phone className="mr-2 h-4 w-4" />
-                    Send OTP & Create Account
+                    <Mail className="mr-2 h-4 w-4" />
+                    Send Magic Link & Create Account
                   </Button>
                 </form>
 
