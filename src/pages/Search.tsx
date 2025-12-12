@@ -159,10 +159,13 @@ export const Search = () => {
   const error = category ? categoryError : (searchQuery ? searchError : filteredError);
   const rawResults = category ? categoryResults?.results : (searchQuery ? searchResults?.results : filteredResults?.results);
   
-  // Sort results by user preferences
+  // Sort results by user preferences and filter to only include items with posters
+  // This ensures the displayed count matches the actual visible items
   const results = useMemo(() => {
     if (!rawResults) return rawResults;
-    return sortByUserPreferences(rawResults, userPreferences);
+    // Filter items that have a valid poster_path first, then sort by preferences
+    const filteredResults = rawResults.filter((item) => item.poster_path);
+    return sortByUserPreferences(filteredResults, userPreferences);
   }, [rawResults, userPreferences]);
 
   return (
@@ -256,11 +259,9 @@ export const Search = () => {
 
           {results && results.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {results
-                .filter((item) => item.poster_path)
-                .map((item) => (
-                  <MovieCard key={item.id} item={item} />
-                ))}
+              {results.map((item) => (
+                <MovieCard key={item.id} item={item} />
+              ))}
             </div>
           )}
 
