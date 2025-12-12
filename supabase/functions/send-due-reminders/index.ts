@@ -32,6 +32,19 @@ serve(async (req) => {
   try {
     console.log("Starting send-due-reminders function");
 
+    // Parse request body for force mode and specific reminder ID
+    let forceMode = false;
+    let specificReminderId: string | null = null;
+    
+    try {
+      const body = await req.json();
+      forceMode = body?.force === true;
+      specificReminderId = body?.reminderId || null;
+      console.log(`Force mode: ${forceMode}, Specific reminder ID: ${specificReminderId}`);
+    } catch {
+      // No body or invalid JSON, continue with defaults
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const resendApiKey = Deno.env.get("RESEND_API_KEY")!;
@@ -52,12 +65,40 @@ serve(async (req) => {
     const today = new Date().toISOString().split('T')[0];
     console.log(`Checking for reminders due on: ${today}`);
 
-    // Fetch reminders due today that haven't been notified yet
-    const { data: reminders, error: remindersError } = await supabase
-      .from("reminders")
-      .select("*")
-      .eq("release_date", today)
-      .or(`last_notified_on.is.null,last_notified_on.neq.${today}`);
+    let reminders;
+    let remindersError;
+
+    // Force mode: fetch specific reminder or all reminders regardless of date/notification status
+    if (forceMode) {
+      console.log("Force mode enabled - bypassing date and notification checks");
+      
+      if (specificReminderId) {
+        // Fetch specific reminder by ID
+        const result = await supabase
+          .from("reminders")
+          .select("*")
+          .eq("id", specificReminderId);
+        reminders = result.data;
+        remindersError = result.error;
+      } else {
+        // Fetch all reminders that haven't been notified today
+        const result = await supabase
+          .from("reminders")
+          .select("*")
+          .or(`last_notified_on.is.null,last_notified_on.neq.${today}`);
+        reminders = result.data;
+        remindersError = result.error;
+      }
+    } else {
+      // Normal mode: fetch reminders due today that haven't been notified yet
+      const result = await supabase
+        .from("reminders")
+        .select("*")
+        .eq("release_date", today)
+        .or(`last_notified_on.is.null,last_notified_on.neq.${today}`);
+      reminders = result.data;
+      remindersError = result.error;
+    }
 
     if (remindersError) {
       console.error("Error fetching reminders:", remindersError);
@@ -68,7 +109,7 @@ serve(async (req) => {
 
     if (!reminders || reminders.length === 0) {
       return new Response(
-        JSON.stringify({ message: "No reminders due today", count: 0 }),
+        JSON.stringify({ message: "No reminders to process", count: 0 }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
