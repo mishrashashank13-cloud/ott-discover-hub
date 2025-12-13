@@ -38,11 +38,12 @@ serve(async (req) => {
     
     try {
       const body = await req.json();
+      console.log("Request body received:", JSON.stringify(body));
       forceMode = body?.force === true;
       specificReminderId = body?.reminderId || null;
-      console.log(`Force mode: ${forceMode}, Specific reminder ID: ${specificReminderId}`);
-    } catch {
-      // No body or invalid JSON, continue with defaults
+      console.log(`Parsed - Force mode: ${forceMode}, Specific reminder ID: ${specificReminderId}`);
+    } catch (parseError) {
+      console.log("No body or invalid JSON, using defaults. Error:", parseError?.message);
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -81,11 +82,11 @@ serve(async (req) => {
         reminders = result.data;
         remindersError = result.error;
       } else {
-        // Fetch all reminders that haven't been notified today
+        // In force mode, fetch ALL reminders regardless of notification status
+        // This allows retesting even if already marked as notified
         const result = await supabase
           .from("reminders")
-          .select("*")
-          .or(`last_notified_on.is.null,last_notified_on.neq.${today}`);
+          .select("*");
         reminders = result.data;
         remindersError = result.error;
       }
@@ -184,9 +185,19 @@ serve(async (req) => {
           html: bodyHtml,
         });
 
-        console.log(`Email sent to ${profile.email}:`, emailResponse);
+        console.log(`Email response for ${profile.email}:`, emailResponse);
 
-        // Update last_notified_on for all reminders
+        // Check if email was actually sent successfully before marking as notified
+        if (emailResponse.error) {
+          console.error(`Email sending failed for ${profile.email}:`, emailResponse.error);
+          errorCount += userReminders.length;
+          // Don't update last_notified_on if email failed - allows retry
+          continue;
+        }
+
+        console.log(`Email sent successfully to ${profile.email}, ID: ${emailResponse.data?.id}`);
+
+        // Only update last_notified_on if email was sent successfully
         const reminderIds = userReminders.map((r: Reminder) => r.id);
         const { error: updateError } = await supabase
           .from("reminders")
