@@ -125,27 +125,33 @@ export const Home = () => {
   });
 
   // Filter and sort upcoming movies by user preferences
+  // Include movies releasing today or in the future
   const filteredUpcomingMovies = useMemo(() => {
     if (!upcomingMovies?.results) return [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const filtered = upcomingMovies.results.filter(movie => {
-      if (!movie.release_date) return false;
+      // Include movies without release_date as they might be upcoming
+      if (!movie.release_date) return true;
       const releaseDate = new Date(movie.release_date);
-      return releaseDate > today;
+      // Use >= to include movies releasing today
+      return releaseDate >= today;
     });
     return sortByUserPreferences(filtered, userPreferences);
   }, [upcomingMovies, userPreferences]);
 
   // Filter and sort upcoming TV shows by user preferences
+  // Include shows airing today or in the future
   const filteredUpcomingTVShows = useMemo(() => {
     if (!upcomingTVShows?.results) return [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const filtered = upcomingTVShows.results.filter(show => {
-      if (!show.first_air_date) return false;
+      // Include shows without air_date as they might be upcoming
+      if (!show.first_air_date) return true;
       const airDate = new Date(show.first_air_date);
-      return airDate > today;
+      // Use >= to include shows airing today
+      return airDate >= today;
     });
     return sortByUserPreferences(filtered, userPreferences);
   }, [upcomingTVShows, userPreferences]);
