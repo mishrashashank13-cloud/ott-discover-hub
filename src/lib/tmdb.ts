@@ -2,15 +2,19 @@
  * TMDB API Client - Frontend Module
  * 
  * This module handles all TMDB (The Movie Database) API interactions through
- * a backend proxy. The proxy pattern keeps the TMDB API key secure on the
- * server side and prevents exposure in client-side JavaScript bundles.
+ * a Supabase Edge Function proxy. The proxy pattern keeps the TMDB API key 
+ * secure on the server side and prevents exposure in client-side JavaScript.
  * 
- * All requests go through /api/tmdb/* endpoints which are handled by the
- * Python backend (api/index.py).
+ * All requests go through the tmdb-proxy edge function.
  */
+
+import { supabase } from "@/integrations/supabase/client";
 
 // Base URL for TMDB image assets (public, no API key needed)
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p';
+
+// Edge function URL for TMDB proxy
+const EDGE_FUNCTION_URL = 'https://yabzmahzobwuwxylcwoy.supabase.co/functions/v1/tmdb-proxy';
 
 // =============================================================================
 // Type Definitions
@@ -122,28 +126,28 @@ export interface DiscoverFilters {
 
 // =============================================================================
 // API Helper Functions
-// These handle communication with the backend proxy
+// These handle communication with the Supabase Edge Function proxy
 // =============================================================================
 
 /**
- * Make a fetch request to the backend TMDB proxy.
- * Handles error responses and JSON parsing.
- * 
- * @param endpoint - The proxy endpoint path (e.g., '/api/tmdb/trending/movie')
- * @returns Parsed JSON response from the proxy
- * @throws Error if the request fails
- */
-/**
- * Make a fetch request to the backend TMDB proxy.
+ * Make a fetch request to the TMDB proxy edge function.
  * Handles error responses and JSON parsing.
  * Uses secure logging to prevent information disclosure in production.
  * 
- * @param endpoint - The proxy endpoint path (e.g., '/api/tmdb/trending/movie')
+ * @param endpoint - The proxy endpoint path (e.g., '/trending/movie')
  * @returns Parsed JSON response from the proxy
  * @throws Error if the request fails (generic message for security)
  */
 const proxyFetch = async (endpoint: string): Promise<any> => {
-  const response = await fetch(endpoint);
+  // Build full URL to edge function
+  const url = `${EDGE_FUNCTION_URL}${endpoint}`;
+  
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
   
   if (!response.ok) {
     // Log error only in development mode to prevent information disclosure
@@ -166,61 +170,49 @@ export const tmdbApi = {
    * Get trending movies for the current week (India region)
    */
   getTrendingMovies: async (): Promise<{ results: Movie[] }> => {
-    return proxyFetch('/api/tmdb/trending/movie');
+    return proxyFetch('/trending/movie');
   },
 
   /**
    * Get trending TV shows for the current week (India region)
    */
   getTrendingTVShows: async (): Promise<{ results: TVShow[] }> => {
-    return proxyFetch('/api/tmdb/trending/tv');
+    return proxyFetch('/trending/tv');
   },
 
   /**
    * Get upcoming movie releases (India region)
    */
   getUpcomingMovies: async (): Promise<{ results: Movie[] }> => {
-    return proxyFetch('/api/tmdb/upcoming/movie');
+    return proxyFetch('/upcoming/movie');
   },
 
   /**
-   * Get upcoming TV shows using existing backend endpoint
+   * Get upcoming TV shows (India region with OTT provider filtering)
    */
   getUpcomingTVShows: async (): Promise<{ results: TVShow[] }> => {
-    try {
-      // Use existing upcoming-shows endpoint which has OTT provider filtering
-      const res = await fetch('/api/upcoming-shows');
-      if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
-        const data = await res.json();
-        if (data && data.results) return data;
-      }
-    } catch (_) {
-      // Silently fall through to discover endpoint
-    }
-    // Fallback: use discover TV with future air dates
-    const today = new Date().toISOString().slice(0, 10);
-    return proxyFetch(`/api/tmdb/discover/tv?first_air_date_gte=${today}&sort_by=first_air_date.asc`);
+    return proxyFetch('/upcoming/tv');
   },
 
   /**
    * Get popular movies (India region)
    */
   getPopularMovies: async (): Promise<{ results: Movie[] }> => {
-    return proxyFetch('/api/tmdb/popular/movie');
+    return proxyFetch('/popular/movie');
   },
 
   /**
    * Get popular TV shows (India region)
    */
   getPopularTVShows: async (): Promise<{ results: TVShow[] }> => {
-    return proxyFetch('/api/tmdb/popular/tv');
+    return proxyFetch('/popular/tv');
   },
 
   /**
    * Get all trending content (movies and TV combined)
    */
   getTrending: async (): Promise<{ results: (Movie | TVShow)[] }> => {
-    return proxyFetch('/api/tmdb/trending/all');
+    return proxyFetch('/trending/all');
   },
 
   /**
@@ -229,7 +221,7 @@ export const tmdbApi = {
    */
   searchMulti: async (query: string): Promise<{ results: (Movie | TVShow)[] }> => {
     const encodedQuery = encodeURIComponent(query);
-    return proxyFetch(`/api/tmdb/search?query=${encodedQuery}`);
+    return proxyFetch(`/search?query=${encodedQuery}`);
   },
 
   /**
@@ -237,7 +229,7 @@ export const tmdbApi = {
    * @param id - TMDB movie ID
    */
   getMovieDetails: async (id: number): Promise<MovieDetails> => {
-    return proxyFetch(`/api/tmdb/movie/${id}`);
+    return proxyFetch(`/movie/${id}`);
   },
 
   /**
@@ -245,7 +237,7 @@ export const tmdbApi = {
    * @param id - TMDB TV show ID
    */
   getTVShowDetails: async (id: number): Promise<TVShowDetails> => {
-    return proxyFetch(`/api/tmdb/tv/${id}`);
+    return proxyFetch(`/tv/${id}`);
   },
 
   /**
@@ -253,7 +245,7 @@ export const tmdbApi = {
    * @param id - TMDB movie ID
    */
   getMovieCredits: async (id: number): Promise<Credits> => {
-    return proxyFetch(`/api/tmdb/movie/${id}/credits`);
+    return proxyFetch(`/movie/${id}/credits`);
   },
 
   /**
@@ -261,7 +253,7 @@ export const tmdbApi = {
    * @param id - TMDB TV show ID
    */
   getTVShowCredits: async (id: number): Promise<Credits> => {
-    return proxyFetch(`/api/tmdb/tv/${id}/credits`);
+    return proxyFetch(`/tv/${id}/credits`);
   },
 
   /**
@@ -270,7 +262,7 @@ export const tmdbApi = {
    */
   getMoviesByGenre: async (genreIds: number[]): Promise<{ results: Movie[] }> => {
     const genres = genreIds.join(',');
-    return proxyFetch(`/api/tmdb/discover/movie?with_genres=${genres}&sort_by=popularity.desc`);
+    return proxyFetch(`/discover/movie?with_genres=${genres}&sort_by=popularity.desc`);
   },
 
   /**
@@ -279,21 +271,21 @@ export const tmdbApi = {
    */
   getTVShowsByGenre: async (genreIds: number[]): Promise<{ results: TVShow[] }> => {
     const genres = genreIds.join(',');
-    return proxyFetch(`/api/tmdb/discover/tv?with_genres=${genres}&sort_by=popularity.desc`);
+    return proxyFetch(`/discover/tv?with_genres=${genres}&sort_by=popularity.desc`);
   },
 
   /**
    * Get list of all movie genres from TMDB
    */
   getMovieGenres: async (): Promise<{ genres: Genre[] }> => {
-    return proxyFetch('/api/tmdb/genre/movie');
+    return proxyFetch('/genre/movie');
   },
 
   /**
    * Get list of all TV show genres from TMDB
    */
   getTVGenres: async (): Promise<{ genres: Genre[] }> => {
-    return proxyFetch('/api/tmdb/genre/tv');
+    return proxyFetch('/genre/tv');
   },
 
   /**
@@ -301,7 +293,7 @@ export const tmdbApi = {
    * @param region - ISO 3166-1 country code (default: IN for India)
    */
   getWatchProviders: async (region: string = 'IN'): Promise<{ results: WatchProvider[] }> => {
-    return proxyFetch(`/api/tmdb/watch-providers?watch_region=${region}`);
+    return proxyFetch(`/watch-providers?watch_region=${region}`);
   },
 
   /**
@@ -316,7 +308,7 @@ export const tmdbApi = {
     if (filters.primary_release_year) params.append('primary_release_year', filters.primary_release_year.toString());
     if (filters.watch_region) params.append('watch_region', filters.watch_region);
     params.append('sort_by', 'popularity.desc');
-    return proxyFetch(`/api/tmdb/discover/movie?${params.toString()}`);
+    return proxyFetch(`/discover/movie?${params.toString()}`);
   },
 
   /**
@@ -331,7 +323,7 @@ export const tmdbApi = {
     if (filters.first_air_date_year) params.append('first_air_date_year', filters.first_air_date_year.toString());
     if (filters.watch_region) params.append('watch_region', filters.watch_region);
     params.append('sort_by', 'popularity.desc');
-    return proxyFetch(`/api/tmdb/discover/tv?${params.toString()}`);
+    return proxyFetch(`/discover/tv?${params.toString()}`);
   },
 
   /**
@@ -339,7 +331,7 @@ export const tmdbApi = {
    * @param id - TMDB movie ID
    */
   getMovieWatchProviders: async (id: number, region: string = 'IN') => {
-    return proxyFetch(`/api/tmdb/movie/${id}/watch-providers`);
+    return proxyFetch(`/movie/${id}/watch-providers`);
   },
 
   /**
@@ -347,7 +339,7 @@ export const tmdbApi = {
    * @param id - TMDB TV show ID
    */
   getTVWatchProviders: async (id: number, region: string = 'IN') => {
-    return proxyFetch(`/api/tmdb/tv/${id}/watch-providers`);
+    return proxyFetch(`/tv/${id}/watch-providers`);
   },
 
   /**
@@ -358,7 +350,7 @@ export const tmdbApi = {
   getOTTMovies: async (sortBy: 'popularity.desc' | 'vote_average.desc' = 'popularity.desc'): Promise<{ results: Movie[] }> => {
     // Popular OTT providers in India
     const ottProviders = '8|119|122|337|463|531'; // Netflix, Prime, Hotstar, Disney+, Jio Cinema, Zee5
-    return proxyFetch(`/api/tmdb/discover/movie?with_watch_providers=${encodeURIComponent(ottProviders)}&watch_region=IN&sort_by=${sortBy}`);
+    return proxyFetch(`/discover/movie?with_watch_providers=${encodeURIComponent(ottProviders)}&watch_region=IN&sort_by=${sortBy}`);
   },
 
   /**
@@ -367,7 +359,7 @@ export const tmdbApi = {
    */
   getOTTTVShows: async (sortBy: 'popularity.desc' | 'vote_average.desc' = 'popularity.desc'): Promise<{ results: TVShow[] }> => {
     const ottProviders = '8|119|122|337|463|531';
-    return proxyFetch(`/api/tmdb/discover/tv?with_watch_providers=${encodeURIComponent(ottProviders)}&watch_region=IN&sort_by=${sortBy}`);
+    return proxyFetch(`/discover/tv?with_watch_providers=${encodeURIComponent(ottProviders)}&watch_region=IN&sort_by=${sortBy}`);
   },
 
   /**
@@ -376,7 +368,7 @@ export const tmdbApi = {
   getUpcomingOTTMovies: async (): Promise<{ results: Movie[] }> => {
     const today = new Date().toISOString().slice(0, 10);
     const ottProviders = '8|119|122|337|463|531';
-    return proxyFetch(`/api/tmdb/discover/movie?with_watch_providers=${encodeURIComponent(ottProviders)}&watch_region=IN&primary_release_date_gte=${today}&sort_by=primary_release_date.asc`);
+    return proxyFetch(`/discover/movie?with_watch_providers=${encodeURIComponent(ottProviders)}&watch_region=IN&primary_release_date_gte=${today}&sort_by=primary_release_date.asc`);
   },
 
   /**
@@ -385,7 +377,7 @@ export const tmdbApi = {
   getUpcomingOTTTVShows: async (): Promise<{ results: TVShow[] }> => {
     const today = new Date().toISOString().slice(0, 10);
     const ottProviders = '8|119|122|337|463|531';
-    return proxyFetch(`/api/tmdb/discover/tv?with_watch_providers=${encodeURIComponent(ottProviders)}&watch_region=IN&first_air_date_gte=${today}&sort_by=first_air_date.asc`);
+    return proxyFetch(`/discover/tv?with_watch_providers=${encodeURIComponent(ottProviders)}&watch_region=IN&first_air_date_gte=${today}&sort_by=first_air_date.asc`);
   },
 };
 
