@@ -1,8 +1,17 @@
+"""
+FastAPI backend for OTT content tracking application.
+Handles TMDB API integration, user reminders, and scheduled notifications.
+
+Security: All cron/admin endpoints require API key authentication.
+"""
+
 import os
 import logging
 import time
+import hmac
+import hashlib
 from datetime import date, datetime, timedelta
-from fastapi import FastAPI, Query, HTTPException, Request, Depends
+from fastapi import FastAPI, Query, HTTPException, Request, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 import requests
 from dotenv import load_dotenv
@@ -13,16 +22,29 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from auth import router as auth_router  # added auth router import
 
+# Load environment variables first
+load_dotenv()
+
+# ============================================================================
+# Environment Configuration
+# ============================================================================
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
 
-load_dotenv()
+# API Key for authenticating cron/admin endpoints (must be set in production)
+CRON_API_KEY = os.getenv("CRON_API_KEY")
 
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("api")
 
+# TMDB API configuration (no hardcoded fallback for security)
 TMDB_TOKEN = os.getenv("TMDB_ACCESS_TOKEN")
-TMDB_API_KEY = os.getenv("TMDB_API_KEY", "4e44d9029b1270a757cddc766a1bcb63")
+TMDB_API_KEY = os.getenv("TMDB_API_KEY")
+
+# Validate TMDB configuration on startup
+if not TMDB_TOKEN and not TMDB_API_KEY:
+    logger.warning("TMDB credentials not configured. TMDB API calls will fail.")
 
 TMDB_BASE = "https://api.themoviedb.org/3"
 
@@ -39,6 +61,46 @@ app.add_middleware(
 )
 
 app.include_router(auth_router, prefix="/api/auth")  # mount auth endpoints
+
+
+# ============================================================================
+# API Key Authentication Dependency
+# Used to secure cron/admin endpoints from unauthorized access
+# ============================================================================
+async def verify_cron_api_key(x_api_key: Optional[str] = Header(None, alias="X-API-Key")):
+    """
+    Verify API key for cron/admin endpoints.
+    This dependency ensures only authorized callers can trigger scheduled tasks.
+    
+    The API key should be:
+    - Set via CRON_API_KEY environment variable
+    - Passed in X-API-Key header by the caller
+    - Used by your scheduler (e.g., Vercel Cron, Railway Cron) to authenticate
+    """
+    if not CRON_API_KEY:
+        logger.error("CRON_API_KEY not configured - rejecting request")
+        raise HTTPException(
+            status_code=500,
+            detail="Server misconfigured: CRON_API_KEY not set"
+        )
+    
+    if not x_api_key:
+        logger.warning("Cron endpoint called without API key")
+        raise HTTPException(
+            status_code=401,
+            detail="Missing X-API-Key header"
+        )
+    
+    # Use constant-time comparison to prevent timing attacks
+    if not hmac.compare_digest(x_api_key, CRON_API_KEY):
+        logger.warning("Cron endpoint called with invalid API key")
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid API key"
+        )
+    
+    return True
+
 
 # Simple access logging middleware
 @app.middleware("http")
@@ -195,8 +257,12 @@ def _list_new_releases_for_week() -> list[dict]:
 
 
 @app.post("/api/cron/daily-reminders")
-def cron_daily_reminders():
-    # Guard: should be called around 8AM IST by scheduler
+def cron_daily_reminders(authenticated: bool = Depends(verify_cron_api_key)):
+    """
+    Send daily reminder notifications to users.
+    PROTECTED: Requires valid X-API-Key header.
+    Should be called by scheduler around 8AM IST.
+    """
     reminders = _list_due_reminders_for_today()
     if not reminders:
         return {"sent": 0}
@@ -280,7 +346,12 @@ def send_email(sender_email, sender_password, receiver_email, subject, body, smt
         print("❌ Error:", e)
 
 @app.post("/api/cron/weekly-digest")
-def cron_weekly_digest():
+def cron_weekly_digest(authenticated: bool = Depends(verify_cron_api_key)):
+    """
+    Send weekly digest of new releases to all users.
+    PROTECTED: Requires valid X-API-Key header.
+    Only runs on Thursdays (IST).
+    """
     # Only act on Thursday IST
     if not _is_thursday_ist_now():
         return {"sent": 0, "skipped": "not Thursday IST"}
@@ -319,7 +390,11 @@ def cron_weekly_digest():
 
 
 @app.post("/api/reminders/send-due")
-def send_due_reminders():
+def send_due_reminders(authenticated: bool = Depends(verify_cron_api_key)):
+    """
+    Manually trigger sending due reminders.
+    PROTECTED: Requires valid X-API-Key header.
+    """
     reminders = _list_due_reminders_for_today()  # reusing function to fetch due reminders
     if not reminders:
         return {"sent": 0, "message": "No due reminders"}
