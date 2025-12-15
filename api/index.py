@@ -395,7 +395,7 @@ def send_due_reminders(authenticated: bool = Depends(verify_cron_api_key)):
     Manually trigger sending due reminders.
     PROTECTED: Requires valid X-API-Key header.
     """
-    reminders = _list_due_reminders_for_today()  # reusing function to fetch due reminders
+    reminders = _list_due_reminders_for_today()
     if not reminders:
         return {"sent": 0, "message": "No due reminders"}
     sent = 0
@@ -408,4 +408,248 @@ def send_due_reminders(authenticated: bool = Depends(verify_cron_api_key)):
         release_date = rem.get("release_date")
         message = {
             "subject": f"Reminder: {title} releasing on {release_date}",
-            "bodyText": f"Your reminder for '{title}' is due. Release date: {release_date}.
+            "bodyText": f"Your reminder for '{title}' is due. Release date: {release_date}.",
+        }
+        try:
+            _notify_via_edge(email, phone, message)
+            sent += 1
+        except Exception as e:
+            logger.warning("Send-due notification failed for user %s: %s", user_id, e)
+            continue
+        # Mark as notified
+        today = _ist_now_date().isoformat()
+        _fetch_supabase(
+            f"reminders?id=eq.{rem['id']}",
+            method="PATCH",
+            json_body={"last_notified_on": today},
+        )
+    return {"sent": sent}
+
+
+# ============================================================================
+# TMDB Proxy Endpoints
+# These endpoints proxy TMDB API requests to keep API keys server-side only
+# ============================================================================
+
+def _tmdb_request(endpoint: str, params: dict = None) -> dict:
+    """
+    Make a request to TMDB API with proper authentication.
+    Uses Bearer token (TMDB_ACCESS_TOKEN) or api_key fallback.
+    """
+    if not TMDB_TOKEN and not TMDB_API_KEY:
+        raise HTTPException(status_code=500, detail="TMDB credentials not configured")
+    
+    url = f"{TMDB_BASE}{endpoint}"
+    headers = {"Authorization": f"Bearer {TMDB_TOKEN}"} if TMDB_TOKEN else {}
+    
+    # Add api_key param if using key-based auth
+    if params is None:
+        params = {}
+    if not TMDB_TOKEN:
+        params["api_key"] = TMDB_API_KEY
+    
+    try:
+        response = requests.get(url, headers=headers, params=params, timeout=15)
+    except requests.RequestException as e:
+        logger.error("TMDB request failed: %s", e)
+        raise HTTPException(status_code=502, detail="Failed to reach TMDB API")
+    
+    if response.status_code != 200:
+        logger.warning("TMDB API error: %s %s", response.status_code, response.text[:200])
+        raise HTTPException(status_code=response.status_code, detail="TMDB API error")
+    
+    return response.json()
+
+
+def _tmdb_multi_page(endpoint: str, params: dict = None, max_pages: int = 5) -> dict:
+    """
+    Fetch multiple pages from TMDB and combine results.
+    Returns combined results from up to max_pages.
+    """
+    all_results = []
+    base_params = params or {}
+    
+    for page in range(1, max_pages + 1):
+        page_params = {**base_params, "page": page}
+        data = _tmdb_request(endpoint, page_params)
+        results = data.get("results", [])
+        all_results.extend(results)
+        
+        # Stop if we've reached the last page
+        if page >= data.get("total_pages", 1) or not results:
+            break
+    
+    return {"results": all_results}
+
+
+@app.get("/api/tmdb/trending/movie")
+def tmdb_trending_movies():
+    """Get trending movies (proxied from TMDB)."""
+    return _tmdb_multi_page("/trending/movie/week", {"region": "IN"})
+
+
+@app.get("/api/tmdb/trending/tv")
+def tmdb_trending_tv():
+    """Get trending TV shows (proxied from TMDB)."""
+    return _tmdb_multi_page("/trending/tv/week", {"region": "IN"})
+
+
+@app.get("/api/tmdb/upcoming/movie")
+def tmdb_upcoming_movies():
+    """Get upcoming movies (proxied from TMDB)."""
+    return _tmdb_multi_page("/movie/upcoming", {"region": "IN"})
+
+
+@app.get("/api/tmdb/popular/movie")
+def tmdb_popular_movies():
+    """Get popular movies (proxied from TMDB)."""
+    return _tmdb_multi_page("/movie/popular", {"region": "IN"})
+
+
+@app.get("/api/tmdb/popular/tv")
+def tmdb_popular_tv():
+    """Get popular TV shows (proxied from TMDB)."""
+    return _tmdb_multi_page("/tv/popular", {"region": "IN"})
+
+
+@app.get("/api/tmdb/trending/all")
+def tmdb_trending_all():
+    """Get all trending content (proxied from TMDB)."""
+    return _tmdb_request("/trending/all/week", {"region": "IN"})
+
+
+@app.get("/api/tmdb/search")
+def tmdb_search(query: str = Query(..., min_length=1, max_length=200)):
+    """
+    Search for movies and TV shows.
+    Query parameter is validated for length to prevent abuse.
+    """
+    return _tmdb_request("/search/multi", {"query": query, "region": "IN"})
+
+
+@app.get("/api/tmdb/movie/{movie_id}")
+def tmdb_movie_details(movie_id: int):
+    """Get movie details by ID."""
+    if movie_id < 1:
+        raise HTTPException(status_code=400, detail="Invalid movie ID")
+    return _tmdb_request(f"/movie/{movie_id}")
+
+
+@app.get("/api/tmdb/tv/{tv_id}")
+def tmdb_tv_details(tv_id: int):
+    """Get TV show details by ID."""
+    if tv_id < 1:
+        raise HTTPException(status_code=400, detail="Invalid TV show ID")
+    return _tmdb_request(f"/tv/{tv_id}")
+
+
+@app.get("/api/tmdb/movie/{movie_id}/credits")
+def tmdb_movie_credits(movie_id: int):
+    """Get movie credits by ID."""
+    if movie_id < 1:
+        raise HTTPException(status_code=400, detail="Invalid movie ID")
+    return _tmdb_request(f"/movie/{movie_id}/credits")
+
+
+@app.get("/api/tmdb/tv/{tv_id}/credits")
+def tmdb_tv_credits(tv_id: int):
+    """Get TV show credits by ID."""
+    if tv_id < 1:
+        raise HTTPException(status_code=400, detail="Invalid TV show ID")
+    return _tmdb_request(f"/tv/{tv_id}/credits")
+
+
+@app.get("/api/tmdb/discover/movie")
+def tmdb_discover_movies(
+    with_genres: Optional[str] = None,
+    with_watch_providers: Optional[str] = None,
+    with_original_language: Optional[str] = None,
+    primary_release_year: Optional[int] = None,
+    watch_region: Optional[str] = "IN",
+    sort_by: str = "popularity.desc",
+    primary_release_date_gte: Optional[str] = None
+):
+    """
+    Discover movies with various filters.
+    All parameters are validated before passing to TMDB.
+    """
+    params = {"sort_by": sort_by}
+    if with_genres:
+        params["with_genres"] = with_genres
+    if with_watch_providers:
+        params["with_watch_providers"] = with_watch_providers
+    if with_original_language:
+        params["with_original_language"] = with_original_language
+    if primary_release_year:
+        params["primary_release_year"] = primary_release_year
+    if watch_region:
+        params["watch_region"] = watch_region
+    if primary_release_date_gte:
+        params["primary_release_date.gte"] = primary_release_date_gte
+    
+    return _tmdb_multi_page("/discover/movie", params)
+
+
+@app.get("/api/tmdb/discover/tv")
+def tmdb_discover_tv(
+    with_genres: Optional[str] = None,
+    with_watch_providers: Optional[str] = None,
+    with_original_language: Optional[str] = None,
+    first_air_date_year: Optional[int] = None,
+    watch_region: Optional[str] = "IN",
+    sort_by: str = "popularity.desc",
+    first_air_date_gte: Optional[str] = None
+):
+    """
+    Discover TV shows with various filters.
+    All parameters are validated before passing to TMDB.
+    """
+    params = {"sort_by": sort_by}
+    if with_genres:
+        params["with_genres"] = with_genres
+    if with_watch_providers:
+        params["with_watch_providers"] = with_watch_providers
+    if with_original_language:
+        params["with_original_language"] = with_original_language
+    if first_air_date_year:
+        params["first_air_date_year"] = first_air_date_year
+    if watch_region:
+        params["watch_region"] = watch_region
+    if first_air_date_gte:
+        params["first_air_date.gte"] = first_air_date_gte
+    
+    return _tmdb_multi_page("/discover/tv", params)
+
+
+@app.get("/api/tmdb/genre/movie")
+def tmdb_movie_genres():
+    """Get list of movie genres."""
+    return _tmdb_request("/genre/movie/list")
+
+
+@app.get("/api/tmdb/genre/tv")
+def tmdb_tv_genres():
+    """Get list of TV genres."""
+    return _tmdb_request("/genre/tv/list")
+
+
+@app.get("/api/tmdb/watch-providers")
+def tmdb_watch_providers(watch_region: str = "IN"):
+    """Get available watch providers for a region."""
+    return _tmdb_request("/watch/providers/movie", {"watch_region": watch_region})
+
+
+@app.get("/api/tmdb/movie/{movie_id}/watch-providers")
+def tmdb_movie_watch_providers(movie_id: int):
+    """Get watch providers for a specific movie."""
+    if movie_id < 1:
+        raise HTTPException(status_code=400, detail="Invalid movie ID")
+    return _tmdb_request(f"/movie/{movie_id}/watch/providers")
+
+
+@app.get("/api/tmdb/tv/{tv_id}/watch-providers")
+def tmdb_tv_watch_providers(tv_id: int):
+    """Get watch providers for a specific TV show."""
+    if tv_id < 1:
+        raise HTTPException(status_code=400, detail="Invalid TV show ID")
+    return _tmdb_request(f"/tv/{tv_id}/watch/providers")

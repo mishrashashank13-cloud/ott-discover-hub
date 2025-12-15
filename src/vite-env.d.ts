@@ -1,3 +1,1 @@
 /// <reference types="vite/client" />
-
-const TMDB_API_KEY = '4e44d9029b1270a757cddc766a1bcb63';
