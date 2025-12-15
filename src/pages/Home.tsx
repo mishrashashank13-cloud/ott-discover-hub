@@ -124,36 +124,18 @@ export const Home = () => {
     queryFn: tmdbApi.getUpcomingTVShows,
   });
 
-  // Filter and sort upcoming movies by user preferences
-  // Include movies releasing today or in the future
+  // Sort upcoming movies by user preferences (API already filters by date)
   const filteredUpcomingMovies = useMemo(() => {
     if (!upcomingMovies?.results) return [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const filtered = upcomingMovies.results.filter(movie => {
-      // Include movies without release_date as they might be upcoming
-      if (!movie.release_date) return true;
-      const releaseDate = new Date(movie.release_date);
-      // Use >= to include movies releasing today
-      return releaseDate >= today;
-    });
-    return sortByUserPreferences(filtered, userPreferences);
+    // API already returns upcoming movies, just sort by user preferences
+    return sortByUserPreferences(upcomingMovies.results, userPreferences);
   }, [upcomingMovies, userPreferences]);
 
-  // Filter and sort upcoming TV shows by user preferences
-  // Include shows airing today or in the future
+  // Sort upcoming TV shows by user preferences (API already filters by date)
   const filteredUpcomingTVShows = useMemo(() => {
     if (!upcomingTVShows?.results) return [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const filtered = upcomingTVShows.results.filter(show => {
-      // Include shows without air_date as they might be upcoming
-      if (!show.first_air_date) return true;
-      const airDate = new Date(show.first_air_date);
-      // Use >= to include shows airing today
-      return airDate >= today;
-    });
-    return sortByUserPreferences(filtered, userPreferences);
+    // API already returns upcoming shows, just sort by user preferences
+    return sortByUserPreferences(upcomingTVShows.results, userPreferences);
   }, [upcomingTVShows, userPreferences]);
 
   // Sort trending movies by user preferences
