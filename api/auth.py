@@ -25,7 +25,12 @@ OTP_LENGTH = 6  # Length of OTP code
 # ============================================================================
 # Secure In-Memory OTP Store
 # Format: {identifier: {"otp_hash": str, "created_at": float, "attempts": int}}
-# Note: For production, use Redis or database with TTL for persistence
+# 
+# IMPORTANT: This in-memory storage is suitable for development/testing only.
+# For production deployments, consider:
+# - Redis with TTL for automatic expiration and horizontal scaling
+# - Database storage with scheduled cleanup jobs
+# - This implementation will lose all OTPs on server restart
 # ============================================================================
 otp_store: Dict[str, Dict] = {}
 
@@ -135,10 +140,12 @@ def verify(identifier: str = Body(..., embed=True), otp: str = Body(..., embed=T
     stored = otp_store.get(identifier)
     
     # Check if OTP exists for this identifier
+    # Note: If OTP is not found, it may have expired, been used, or the server
+    # may have restarted (in-memory storage limitation). Provide helpful message.
     if not stored:
         raise HTTPException(
             status_code=400,
-            detail="No OTP generated for this identifier or OTP has expired."
+            detail="OTP not found. This may be due to expiration, server maintenance, or the OTP was already used. Please request a new OTP."
         )
     
     # Check if OTP has expired
