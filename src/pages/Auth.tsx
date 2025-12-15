@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
-import { Film, ArrowLeft, AlertCircle, Loader2, Mail } from 'lucide-react';
+import { Film, ArrowLeft, AlertCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import { PreferencesStep } from '@/components/PreferencesStep';
@@ -19,26 +19,30 @@ import { z } from 'zod';
 // Zod schemas for validating user input before submitting to Supabase
 // =============================================================================
 const emailSchema = z.string().trim().email('Invalid email address').max(255, 'Email too long');
+const passwordSchema = z.string().min(6, 'Password must be at least 6 characters').max(72, 'Password too long');
 
-const signupSchema = z.object({
-  username: z.string().trim().min(3, 'Username must be at least 3 characters').max(30, 'Username too long').regex(/^[a-zA-Z0-9_]+$/, 'Use letters, numbers, underscore only'),
-  email: z.string().trim().email('Invalid email address').max(255, 'Email too long'),
+const signInSchema = z.object({
+  email: emailSchema,
+  password: passwordSchema,
+});
+
+const signUpSchema = z.object({
+  email: emailSchema,
+  password: passwordSchema,
 });
 
 // =============================================================================
 // AUTH COMPONENT
-// Handles user authentication with email magic link as primary, Google as alternative
+// Handles user authentication with email/password and Google OAuth
 // =============================================================================
 export const Auth = () => {
   // Form state for user inputs
   const [email, setEmail] = useState('');
-  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   
   // UI state for loading, errors, and current step
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [magicLinkSent, setMagicLinkSent] = useState(false);
-  const [signupStep, setSignupStep] = useState<1 | 2 | 3 | 4>(1);
   const [showRanking, setShowRanking] = useState(false);
   const [showPreferences, setShowPreferences] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -59,6 +63,7 @@ export const Auth = () => {
         .eq('user_id', userId)
         .single();
       
+      // Determine if user has completed language and genre rankings
       const hasRankings = profile?.language_preferences && 
                          profile?.genre_preferences &&
                          Array.isArray(profile.language_preferences) &&
@@ -66,6 +71,7 @@ export const Auth = () => {
                          profile.language_preferences.length > 0 &&
                          profile.genre_preferences.length > 0;
       
+      // Check if user has any content preferences saved
       const { data: preferences } = await supabase
         .from('user_preferences')
         .select('id')
@@ -82,20 +88,22 @@ export const Auth = () => {
       if (session?.user) {
         setUserId(session.user.id);
         
-        const { hasRankings, hasPreferences } = await checkUserStatus(session.user.id);
-        
-        if (!hasRankings) {
-          setShowRanking(true);
-          setSignupStep(3);
-        } else if (!hasPreferences) {
-          setShowPreferences(true);
-          setSignupStep(4);
-        } else {
-          navigate('/');
-        }
+        // Defer Supabase calls with setTimeout to prevent deadlock
+        setTimeout(async () => {
+          const { hasRankings, hasPreferences } = await checkUserStatus(session.user.id);
+          
+          if (!hasRankings) {
+            setShowRanking(true);
+          } else if (!hasPreferences) {
+            setShowPreferences(true);
+          } else {
+            navigate('/');
+          }
+        }, 0);
       }
     });
 
+    // Check for existing session on component mount
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         setUserId(session.user.id);
@@ -104,10 +112,8 @@ export const Auth = () => {
         
         if (!hasRankings) {
           setShowRanking(true);
-          setSignupStep(3);
         } else if (!hasPreferences) {
           setShowPreferences(true);
-          setSignupStep(4);
         } else {
           navigate('/');
         }
@@ -118,53 +124,16 @@ export const Auth = () => {
   }, [navigate]);
 
   // ===========================================================================
-  // EMAIL MAGIC LINK HANDLER (SIGN IN)
-  // Sends a passwordless magic link to the user's email for authentication
+  // SIGN IN HANDLER
+  // Authenticates user with email and password
   // ===========================================================================
-  const handleSendMagicLink = async () => {
-    setIsLoading(true);
-    setError('');
-
-    // Validate email format
-    const result = emailSchema.safeParse(email);
-    if (!result.success) {
-      setError(result.error.issues[0]?.message ?? 'Invalid email address');
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: email.trim(),
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth`,
-        },
-      });
-
-      if (error) throw error;
-
-      setMagicLinkSent(true);
-      toast({
-        title: "Magic Link Sent",
-        description: `Check your inbox at ${email} for the login link`,
-      });
-    } catch (error: any) {
-      setError(error.message ?? 'Failed to send magic link');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // ===========================================================================
-  // EMAIL MAGIC LINK SIGNUP HANDLER
-  // Creates new account with username and email, sends magic link for verification
-  // ===========================================================================
-  const handleSignUp = async (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
-    const result = signupSchema.safeParse({ username, email });
+    // Validate email and password format
+    const result = signInSchema.safeParse({ email, password });
     if (!result.success) {
       setError(result.error.issues[0]?.message ?? 'Please check your inputs');
       setIsLoading(false);
@@ -172,27 +141,72 @@ export const Auth = () => {
     }
 
     try {
-      // Sign up with email magic link and store username in user metadata
-      const { error } = await supabase.auth.signInWithOtp({
+      const { error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
+        password,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Welcome back!",
+        description: "You have successfully signed in",
+      });
+    } catch (error: any) {
+      // Handle specific error cases with user-friendly messages
+      if (error.message.includes('Invalid login credentials')) {
+        setError('Invalid email or password. Please try again.');
+      } else {
+        setError(error.message ?? 'Sign in failed');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ===========================================================================
+  // SIGN UP HANDLER
+  // Creates new account with email and password
+  // ===========================================================================
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+
+    // Validate email and password format
+    const result = signUpSchema.safeParse({ email, password });
+    if (!result.success) {
+      setError(result.error.issues[0]?.message ?? 'Please check your inputs');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      // Sign up with email/password and use email as username
+      const { error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
         options: {
           emailRedirectTo: `${window.location.origin}/auth`,
           data: {
-            username,
+            username: email.trim().split('@')[0], // Use email prefix as username
           },
         },
       });
 
       if (error) throw error;
 
-      setMagicLinkSent(true);
-      setSignupStep(2);
       toast({
-        title: "Magic Link Sent",
-        description: `Check your inbox at ${email} to complete signup`,
+        title: "Account Created!",
+        description: "Please check your email to verify your account",
       });
     } catch (error: any) {
-      setError(error.message ?? 'Sign up failed');
+      // Handle specific error cases with user-friendly messages
+      if (error.message.includes('already registered')) {
+        setError('This email is already registered. Please sign in instead.');
+      } else {
+        setError(error.message ?? 'Sign up failed');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -210,7 +224,7 @@ export const Auth = () => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth?step=preferences`,
+          redirectTo: `${window.location.origin}/auth`,
         },
       });
 
@@ -223,25 +237,24 @@ export const Auth = () => {
 
   // ===========================================================================
   // CONDITIONAL RENDERS
-  // Show ranking, preferences, or magic link confirmation screens based on step
+  // Show ranking or preferences screens based on user onboarding step
   // ===========================================================================
   
   // Show ranking step after successful authentication
-  if (showRanking || signupStep === 3) {
+  if (showRanking) {
     return (
       <RankingStep 
         userId={userId}
         onComplete={() => {
           setShowRanking(false);
           setShowPreferences(true);
-          setSignupStep(4);
         }}
       />
     );
   }
 
   // Show content preferences step after ranking
-  if (showPreferences || signupStep === 4) {
+  if (showPreferences) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-5xl space-y-6">
@@ -269,74 +282,9 @@ export const Auth = () => {
     );
   }
 
-  // Show magic link sent confirmation screen
-  if (magicLinkSent) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="w-full max-w-md space-y-6">
-          <Button variant="ghost" size="sm" onClick={() => { setMagicLinkSent(false); setError(''); }} className="absolute top-4 left-4">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-
-          <div className="text-center space-y-4">
-            <div className="flex items-center justify-center gap-2">
-              <Film className="h-8 w-8 text-primary" />
-              <span className="text-2xl font-bold bg-hero-gradient bg-clip-text text-transparent">
-                BingeGuide
-              </span>
-            </div>
-          </div>
-
-          <Card className="border-border bg-card">
-            <CardHeader className="space-y-1">
-              <CardTitle className="text-2xl text-center">Check Your Email</CardTitle>
-              <CardDescription className="text-center">
-                We've sent a magic link to <strong>{email}</strong>
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Email icon illustration */}
-              <div className="flex justify-center py-6">
-                <div className="rounded-full bg-primary/10 p-6">
-                  <Mail className="h-12 w-12 text-primary" />
-                </div>
-              </div>
-
-              <p className="text-center text-sm text-muted-foreground">
-                Click the link in the email to sign in. The link expires in 1 hour.
-              </p>
-
-              <div className="text-center pt-4">
-                <Button
-                  type="button"
-                  variant="link"
-                  onClick={handleSendMagicLink}
-                  disabled={isLoading}
-                >
-                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Didn't receive it? Resend magic link
-                </Button>
-              </div>
-
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => { setMagicLinkSent(false); setEmail(''); setError(''); }}
-                className="w-full"
-              >
-                Use a different email
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
   // ===========================================================================
   // MAIN AUTH SCREEN
-  // Primary login with email magic link, Google as alternative
+  // Email/password authentication with Google as alternative
   // ===========================================================================
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -378,11 +326,10 @@ export const Auth = () => {
               
               {/* ============================================================= */}
               {/* SIGN IN TAB */}
-              {/* Primary: Email Magic Link, Alternative: Google */}
+              {/* Email/Password login with Google alternative */}
               {/* ============================================================= */}
               <TabsContent value="signin" className="space-y-4">
-                {/* Email Magic Link Login */}
-                <div className="space-y-4">
+                <form onSubmit={handleSignIn} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="signin-email">Email Address</Label>
                     <Input
@@ -392,10 +339,21 @@ export const Auth = () => {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       disabled={isLoading}
+                      required
                     />
-                    <p className="text-xs text-muted-foreground">
-                      We'll send you a magic link to sign in - no password needed
-                    </p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="signin-password">Password</Label>
+                    <Input
+                      id="signin-password"
+                      type="password"
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      disabled={isLoading}
+                      required
+                    />
                   </div>
                   
                   {error && (
@@ -406,15 +364,14 @@ export const Auth = () => {
                   )}
                   
                   <Button 
-                    onClick={handleSendMagicLink}
+                    type="submit"
                     className="w-full" 
-                    disabled={isLoading || !email}
+                    disabled={isLoading}
                   >
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    <Mail className="mr-2 h-4 w-4" />
-                    Send Magic Link
+                    Sign In
                   </Button>
-                </div>
+                </form>
 
                 {/* Separator and Google Login */}
                 <div className="relative my-4">
@@ -444,24 +401,10 @@ export const Auth = () => {
               
               {/* ============================================================= */}
               {/* SIGN UP TAB */}
-              {/* Collects username and email, sends magic link for verification */}
+              {/* Email/Password signup with Google alternative */}
               {/* ============================================================= */}
               <TabsContent value="signup" className="space-y-4">
                 <form onSubmit={handleSignUp} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-username">Username</Label>
-                    <Input
-                      id="signup-username"
-                      type="text"
-                      placeholder="Choose a unique username"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      required
-                      minLength={3}
-                      disabled={isLoading}
-                    />
-                  </div>
-
                   <div className="space-y-2">
                     <Label htmlFor="signup-email">Email Address</Label>
                     <Input
@@ -474,8 +417,22 @@ export const Auth = () => {
                       disabled={isLoading}
                     />
                     <p className="text-xs text-muted-foreground">
-                      We'll send you a magic link to verify your email
+                      Your email will be used as your login
                     </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-password">Password</Label>
+                    <Input
+                      id="signup-password"
+                      type="password"
+                      placeholder="Create a password (min 6 characters)"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      minLength={6}
+                      disabled={isLoading}
+                    />
                   </div>
                   
                   {error && (
@@ -491,8 +448,7 @@ export const Auth = () => {
                     disabled={isLoading}
                   >
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    <Mail className="mr-2 h-4 w-4" />
-                    Send Magic Link & Create Account
+                    Create Account
                   </Button>
                 </form>
 
