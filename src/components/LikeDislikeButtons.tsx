@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ThumbsUp, ThumbsDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 
 /**
  * LikeDislikeButtons Component
@@ -39,14 +40,16 @@ export const LikeDislikeButtons = ({
     let isMounted = true;
 
     const checkAuth = async () => {
-      console.log("[LikeDislikeButtons] Checking auth for content:", contentId);
+      // Debug logging only in development mode
+      logger.log("[LikeDislikeButtons] Checking auth for content:", contentId);
       const { data: { session }, error } = await supabase.auth.getSession();
       
       if (error) {
-        console.error("[LikeDislikeButtons] Auth error:", error);
+        // Log authentication errors only in development
+        logger.error("[LikeDislikeButtons] Auth error:", error);
       }
       
-      console.log("[LikeDislikeButtons] Session:", session?.user?.id || "No user");
+      logger.log("[LikeDislikeButtons] Session:", session?.user?.id || "No user");
       
       if (!isMounted) return;
       
@@ -63,7 +66,7 @@ export const LikeDislikeButtons = ({
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log("[LikeDislikeButtons] Auth state changed:", event, session?.user?.id);
+        logger.log("[LikeDislikeButtons] Auth state changed:", event);
         if (!isMounted) return;
         
         setUserId(session?.user?.id || null);
@@ -102,7 +105,8 @@ export const LikeDislikeButtons = ({
         setCurrentReaction(null);
       }
     } catch (error) {
-      console.error("Error fetching user preference:", error);
+      // Log error only in development to prevent info disclosure
+      logger.error("Error fetching user preference:", error);
     }
   };
 
@@ -163,7 +167,8 @@ export const LikeDislikeButtons = ({
         toast.success(reaction === "like" ? "Added to liked content" : "Added to disliked content");
       }
     } catch (error) {
-      console.error("Error updating reaction:", error);
+      // Log error only in development to prevent info disclosure
+      logger.error("Error updating reaction:", error);
       toast.error("Failed to update reaction");
     } finally {
       setIsLoading(false);

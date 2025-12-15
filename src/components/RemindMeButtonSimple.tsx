@@ -1,6 +1,18 @@
 import { Button } from "@/components/ui/button";
 import { Bell } from "lucide-react";
+import { logger } from "@/lib/logger";
 
+/**
+ * RemindMeButtonSimple Component
+ * 
+ * A simple remind me button for content (movies/TV shows).
+ * This is a simplified version that logs the action in development.
+ * 
+ * @param contentId - The ID of the content
+ * @param contentTitle - The title of the content
+ * @param contentType - Type of content ('movie' or 'tv')
+ * @param releaseDate - The release date of the content
+ */
 interface RemindMeButtonSimpleProps {
   contentId: string;
   contentTitle: string;
@@ -21,7 +33,8 @@ export const RemindMeButtonSimple = ({
   size = "default"
 }: RemindMeButtonSimpleProps) => {
   const handleClick = () => {
-    console.log("Remind me clicked!", { contentId, contentTitle, contentType, releaseDate });
+    // Log action only in development mode
+    logger.log("Remind me clicked!", { contentId, contentTitle, contentType, releaseDate });
     alert(`Remind me for ${contentTitle} (${contentType}) releasing on ${releaseDate}`);
   };
 

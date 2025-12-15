@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Home, Search, Film, Globe, User, LogOut, LayoutDashboard, Settings, History, Heart, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { logger } from "@/lib/logger";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -76,7 +77,8 @@ export const Navigation = () => {
         setUserProfile(data);
       }
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      // Log error only in development to prevent info disclosure
+      logger.error('Error fetching profile:', error);
     }
   };
 
@@ -130,7 +132,8 @@ export const Navigation = () => {
       setShowDeleteDialog(false);
       navigate('/');
     } catch (error) {
-      console.error('Error deleting account:', error);
+      // Log error only in development to prevent info disclosure
+      logger.error('Error deleting account:', error);
       toast({
         title: "Error deleting account",
         description: "Please try again or contact support.",

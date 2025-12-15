@@ -133,12 +133,23 @@ export interface DiscoverFilters {
  * @returns Parsed JSON response from the proxy
  * @throws Error if the request fails
  */
+/**
+ * Make a fetch request to the backend TMDB proxy.
+ * Handles error responses and JSON parsing.
+ * Uses secure logging to prevent information disclosure in production.
+ * 
+ * @param endpoint - The proxy endpoint path (e.g., '/api/tmdb/trending/movie')
+ * @returns Parsed JSON response from the proxy
+ * @throws Error if the request fails (generic message for security)
+ */
 const proxyFetch = async (endpoint: string): Promise<any> => {
   const response = await fetch(endpoint);
   
   if (!response.ok) {
-    // Log error for debugging but don't expose internal details
-    console.error('TMDB proxy request failed:', response.status);
+    // Log error only in development mode to prevent information disclosure
+    if (import.meta.env.DEV) {
+      console.error('TMDB proxy request failed:', response.status);
+    }
     throw new Error('Failed to fetch content data');
   }
   

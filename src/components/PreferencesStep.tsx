@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { logger } from '@/lib/logger';
 
 interface TasteClassic {
   id: number;
@@ -97,7 +98,8 @@ export const PreferencesStep = () => {
         setGenres(uniqueGenres);
       }
     } catch (error) {
-      console.error('Error loading content:', error);
+      // Log error only in development to prevent info disclosure
+      logger.error('Error loading content:', error);
       toast({
         title: "Error",
         description: "Failed to load content. Please try again.",
@@ -168,10 +170,11 @@ export const PreferencesStep = () => {
 
       navigate('/');
     } catch (error: any) {
-      console.error('Error saving preferences:', error);
+      // Log error only in development to prevent info disclosure
+      logger.error('Error saving preferences:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to save preferences.",
+        description: "Failed to save preferences. Please try again.",
         variant: "destructive",
       });
     } finally {
