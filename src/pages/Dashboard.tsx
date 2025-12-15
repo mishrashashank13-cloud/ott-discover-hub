@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format, isToday, isThisWeek, parseISO } from "date-fns";
+import { logger } from "@/lib/logger";
 
 // Interface for reminder data structure
 interface Reminder {
@@ -76,7 +77,8 @@ export const Dashboard = () => {
 
       setReminders(data || []);
     } catch (error: any) {
-      console.error('Error fetching reminders:', error);
+      // Log error only in development to prevent info disclosure
+      logger.error('Error fetching reminders:', error);
       toast({
         title: "Error",
         description: "Failed to load your reminders.",
@@ -98,7 +100,8 @@ export const Dashboard = () => {
 
       setRecommendations(data || []);
     } catch (error: any) {
-      console.error('Error fetching recommendations:', error);
+      // Log error only in development to prevent info disclosure
+      logger.error('Error fetching recommendations:', error);
       toast({
         title: "Error",
         description: "Failed to load your recommendations.",

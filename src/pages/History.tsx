@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Trash2, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { logger } from "@/lib/logger";
 
 /**
  * History Page Component
@@ -48,7 +49,8 @@ export const History = () => {
       if (error) throw error;
       setHistory(data || []);
     } catch (error) {
-      console.error("Error fetching history:", error);
+      // Log error only in development to prevent info disclosure
+      logger.error("Error fetching history:", error);
       toast({
         title: "Error",
         description: "Failed to load browsing history",
@@ -75,7 +77,8 @@ export const History = () => {
         description: "History entry deleted",
       });
     } catch (error) {
-      console.error("Error deleting history:", error);
+      // Log error only in development to prevent info disclosure
+      logger.error("Error deleting history:", error);
       toast({
         title: "Error",
         description: "Failed to delete history entry",
@@ -100,7 +103,8 @@ export const History = () => {
         description: "All browsing history has been cleared",
       });
     } catch (error) {
-      console.error("Error clearing history:", error);
+      // Log error only in development to prevent info disclosure
+      logger.error("Error clearing history:", error);
       toast({
         title: "Error",
         description: "Failed to clear history",

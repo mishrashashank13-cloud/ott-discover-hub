@@ -9,6 +9,7 @@ import { LikeDislikeButtons } from "@/components/LikeDislikeButtons";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { logger } from "@/lib/logger";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { 
@@ -83,7 +84,8 @@ export const TVShowDetails = () => {
           viewed_at: new Date().toISOString(),
         });
       } catch (error) {
-        console.error("Error capturing browsing history:", error);
+        // Log error only in development to prevent info disclosure
+        logger.error("Error capturing browsing history:", error);
       }
     };
 

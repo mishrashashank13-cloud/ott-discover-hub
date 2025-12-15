@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Heart, ThumbsDown, Trash2, Film, Tv } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { logger } from "@/lib/logger";
 
 // Interface for user preference data from the database
 interface UserPreference {
@@ -54,7 +55,8 @@ export const Preferences = () => {
         if (error) throw error;
         setPreferences(data || []);
       } catch (error) {
-        console.error('Error fetching preferences:', error);
+        // Log error only in development to prevent info disclosure
+        logger.error('Error fetching preferences:', error);
         toast({
           title: "Error loading preferences",
           description: "Failed to load your preferences. Please try again.",
@@ -84,7 +86,8 @@ export const Preferences = () => {
         description: "Your preference has been deleted.",
       });
     } catch (error) {
-      console.error('Error deleting preference:', error);
+      // Log error only in development to prevent info disclosure
+      logger.error('Error deleting preference:', error);
       toast({
         title: "Error",
         description: "Failed to delete preference. Please try again.",

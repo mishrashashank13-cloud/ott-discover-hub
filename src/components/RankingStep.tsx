@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, GripVertical, Check } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 
 // Available languages and genres for OTT content in India
 const AVAILABLE_LANGUAGES = [
@@ -141,10 +142,11 @@ export const RankingStep: React.FC<RankingStepProps> = ({ onComplete, userId }) 
 
       onComplete();
     } catch (error: any) {
-      console.error('Error saving preferences:', error);
+      // Log error only in development to prevent info disclosure
+      logger.error('Error saving preferences:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to save preferences. Please try again.",
+        description: "Failed to save preferences. Please try again.",
         variant: "destructive",
       });
     } finally {

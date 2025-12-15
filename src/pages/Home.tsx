@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState, useMemo } from "react";
 import { sortByUserPreferences, UserPreferences } from "@/lib/contentSorting";
+import { logger } from "@/lib/logger";
 
 export const Home = () => {
   const navigate = useNavigate();
@@ -58,7 +59,8 @@ export const Home = () => {
                 details.genres.forEach(g => genres.add(g.id));
               }
             } catch (error) {
-              console.error('Error fetching content details:', error);
+              // Log error only in development to prevent info disclosure
+              logger.error('Error fetching content details:', error);
             }
           }
           
