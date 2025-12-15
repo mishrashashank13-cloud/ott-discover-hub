@@ -6,7 +6,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 // ============================================================
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-function-key",
 };
 
 // ============================================================
@@ -47,6 +47,21 @@ function base64Encode(str: string): string {
 }
 
 // ============================================================
+// Constant-time comparison for secure secret comparison
+// Prevents timing attacks on authentication
+// ============================================================
+function secureCompare(a: string, b: string): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
+
+// ============================================================
 // SMTP Email Sending Function (Raw Socket Implementation)
 // Uses direct TCP/TLS connection for Gmail SMTP
 // ============================================================
@@ -79,7 +94,7 @@ async function sendEmailViaSMTP(
   }
 
   console.log(`Attempting to send email via SMTP to: ${to}`);
-  console.log(`SMTP Config - Host: ${smtpHost}, Port: ${smtpPort}, User: ${smtpUser}`);
+  console.log(`SMTP Config - Host: ${smtpHost}, Port: ${smtpPort}`);
 
   try {
     // Connect to SMTP server using TLS (port 465 for Gmail)
@@ -209,6 +224,29 @@ serve(async (req) => {
     console.log("Starting send-due-reminders function");
 
     // --------------------------------------------------------
+    // SECURITY: Verify API key authentication
+    // The function requires a valid X-Function-Key header to prevent
+    // unauthorized access and potential DoS/spam attacks
+    // --------------------------------------------------------
+    const functionSecret = Deno.env.get("REMINDER_FUNCTION_SECRET");
+    const requestKey = req.headers.get("X-Function-Key") || req.headers.get("x-function-key");
+
+    // If secret is configured, require authentication
+    if (functionSecret) {
+      if (!requestKey || !secureCompare(requestKey, functionSecret)) {
+        console.log("Unauthorized request - invalid or missing function key");
+        return new Response(
+          JSON.stringify({ error: "Unauthorized - valid X-Function-Key header required" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      console.log("Request authenticated successfully");
+    } else {
+      // Log warning if no secret is configured (development mode)
+      console.warn("WARNING: REMINDER_FUNCTION_SECRET not configured - running without authentication");
+    }
+
+    // --------------------------------------------------------
     // Parse request body for optional parameters
     // - force: boolean - bypass date/notification checks
     // - reminderId: string - process specific reminder only
@@ -224,7 +262,7 @@ serve(async (req) => {
       console.log(`Parsed - Force mode: ${forceMode}, Specific reminder ID: ${specificReminderId}`);
     } catch (parseError) {
       // No body or invalid JSON is acceptable, continue with defaults
-      console.log("No body or invalid JSON, using defaults. Error:", parseError?.message);
+      console.log("No body or invalid JSON, using defaults");
     }
 
     // --------------------------------------------------------
@@ -413,7 +451,7 @@ serve(async (req) => {
     // Handle any unexpected errors in the function
     console.error("Error in send-due-reminders function:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: "Internal server error" }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
