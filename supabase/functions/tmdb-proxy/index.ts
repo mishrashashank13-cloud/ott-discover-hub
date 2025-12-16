@@ -18,29 +18,79 @@ const corsHeaders = {
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 
 /**
- * Make authenticated request to TMDB API
- * Uses the TMDB_ACCESS_TOKEN from environment variables
+ * Make an authenticated request to TMDB.
+ *
+ * Why this exists:
+ * - We NEVER call TMDB directly from the browser (it would expose credentials).
+ * - This function reads TMDB credentials from server-side secrets.
+ *
+ * Supported credentials (either one is enough):
+ * - TMDB_ACCESS_TOKEN: TMDB v4 Read Access Token (recommended)
+ * - TMDB_API_KEY: TMDB v3 API Key (fallback)
  */
 async function tmdbRequest(endpoint: string): Promise<Response> {
-  const token = Deno.env.get('TMDB_ACCESS_TOKEN');
-  
-  if (!token) {
-    console.error('TMDB_ACCESS_TOKEN not configured');
-    throw new Error('TMDB API token not configured');
+  // Read secrets from the Edge Function environment (server-side only).
+  const rawAccessToken = Deno.env.get('TMDB_ACCESS_TOKEN') ?? '';
+  const rawApiKey = Deno.env.get('TMDB_API_KEY') ?? '';
+
+  // Normalize input to avoid common copy/paste mistakes.
+  // Examples users often paste:
+  // - "Bearer eyJ..." (already includes the prefix)
+  // - tokens with leading/trailing spaces
+  const accessToken = rawAccessToken.trim().replace(/^bearer\s+/i, '');
+  const apiKey = rawApiKey.trim();
+
+  if (!accessToken && !apiKey) {
+    console.error('TMDB credentials are not configured (TMDB_ACCESS_TOKEN / TMDB_API_KEY missing)');
+    throw new Error('TMDB credentials not configured');
   }
 
-  const url = `${TMDB_BASE_URL}${endpoint}`;
-  console.log(`TMDB request: ${endpoint}`);
+  // Build a proper URL object so we can safely add query params when needed.
+  const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
+  console.log(`TMDB request: ${url.pathname}${url.search}`);
 
-  const response = await fetch(url, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  });
+  // For TMDB v4 token auth we use an Authorization header.
+  // For v3 API key auth we append api_key as a query parameter.
+  const headers: Record<string, string> = {
+    // TMDB expects Accept, not Content-Type, for GET requests.
+    Accept: 'application/json',
+  };
+
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  } else {
+    // Keep the API key server-side; it never reaches the browser.
+    url.searchParams.set('api_key', apiKey);
+  }
+
+  // Call TMDB.
+  // If the access token is present but rejected (401), we retry once with the v3 API key.
+  // This avoids hard failures when a token is misconfigured but an API key is valid.
+  let response = await fetch(url.toString(), { headers });
+
+  if (response.status === 401 && accessToken && apiKey) {
+    console.warn('TMDB access token returned 401; retrying with TMDB_API_KEY');
+
+    const retryUrl = new URL(url.toString());
+    retryUrl.searchParams.set('api_key', apiKey);
+
+    const retryHeaders: Record<string, string> = { ...headers };
+    delete retryHeaders.Authorization;
+
+    response = await fetch(retryUrl.toString(), { headers: retryHeaders });
+  }
 
   if (!response.ok) {
+    // Capture a short snippet of TMDB's response body for debugging.
+    // (No secrets are logged here.)
+    const bodySnippet = await response
+      .text()
+      .then((t) => t.slice(0, 300))
+      .catch(() => '');
+
     console.error(`TMDB API error: ${response.status} for ${endpoint}`);
+    if (bodySnippet) console.error(`TMDB API body (first 300 chars): ${bodySnippet}`);
+
     throw new Error(`TMDB API error: ${response.status}`);
   }
 
@@ -239,13 +289,18 @@ serve(async (req) => {
       }
     );
 
-  } catch (error) {
-    console.error('TMDB proxy error:', error.message);
+  } catch (unknownError) {
+    // We keep the client response generic (security best practice),
+    // but we log enough on the server to diagnose the issue.
+    const safeMessage = unknownError instanceof Error ? unknownError.message : String(unknownError);
+
+    console.error('TMDB proxy error:', safeMessage);
+
     return new Response(
       JSON.stringify({ error: 'Failed to fetch content data' }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
   }
