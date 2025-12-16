@@ -180,27 +180,17 @@ def verify(identifier: str = Body(..., embed=True), otp: str = Body(..., embed=T
     
     # Generate secure session token
     session_token = secrets.token_urlsafe(32)
-    
+
     return {"message": "Verification successful", "token": session_token}
 
-@router.post("/social-login")
-def social_login(provider: str = Body(..., embed=True), token: str = Body(..., embed=True)):
-    """
-    Simulate social login.
-    Accepts provider (google or apple) and token; returns a dummy session token.
-    """
-    allowed = {"google", "apple"}
-    if provider.lower() not in allowed:
-        raise HTTPException(status_code=400, detail="Unsupported provider.")
-    # Normally verify the token with the provider.
-    return {"message": f"Social login successful with {provider}", "token": f"{provider}-session-token"}
-
-@router.post("/gdpr-delete")
-def gdpr_delete(user_id: str = Body(..., embed=True)):
-    """
-    GDPR deletion endpoint.
-    In a real system, this would delete all identifiable data.
-    """
-    # For testing, we just log the deletion request.
-    print(f"Deleting user data for user_id: {user_id}")
-    return {"message": f"User data for {user_id} scheduled for deletion."}
+# ============================================================================
+# NOTE: social-login and gdpr-delete endpoints have been removed.
+# 
+# The application uses Supabase Auth for authentication (see src/pages/Auth.tsx):
+# - Email/password authentication with proper validation
+# - Google OAuth with secure redirect configuration
+# 
+# For GDPR data deletion, use Supabase's built-in user management:
+# - Supabase Dashboard > Authentication > Users
+# - Or implement via Supabase Admin SDK with proper authentication
+# ============================================================================
