@@ -137,31 +137,32 @@ export const LikeDislikeButtons = ({
         setCurrentReaction(null);
         toast.success("Reaction removed");
       } else {
-        // If there's an existing reaction, delete it first (since UPDATE is not allowed)
+        // If there's an existing reaction, use UPDATE for efficiency (single atomic operation)
         if (currentReaction) {
-          const { error: deleteError } = await supabase
+          // Update existing preference - more efficient and preserves created_at timestamp
+          const { error: updateError } = await supabase
             .from("user_preferences")
-            .delete()
+            .update({ reaction: reaction })
             .eq("user_id", userId)
             .eq("content_id", contentId)
             .eq("content_type", contentType);
 
-          if (deleteError) throw deleteError;
+          if (updateError) throw updateError;
+        } else {
+          // Insert new reaction for first-time preference
+          const { error: insertError } = await supabase
+            .from("user_preferences")
+            .insert({
+              user_id: userId,
+              content_id: contentId,
+              content_type: contentType,
+              content_title: contentTitle,
+              poster_path: posterPath,
+              reaction: reaction,
+            });
+
+          if (insertError) throw insertError;
         }
-
-        // Insert the new reaction
-        const { error: insertError } = await supabase
-          .from("user_preferences")
-          .insert({
-            user_id: userId,
-            content_id: contentId,
-            content_type: contentType,
-            content_title: contentTitle,
-            poster_path: posterPath,
-            reaction: reaction,
-          });
-
-        if (insertError) throw insertError;
 
         setCurrentReaction(reaction);
         toast.success(reaction === "like" ? "Added to liked content" : "Added to disliked content");
