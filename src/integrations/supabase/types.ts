@@ -47,6 +47,24 @@ export type Database = {
         }
         Relationships: []
       }
+      internal_secrets: {
+        Row: {
+          created_at: string | null
+          key_name: string
+          key_value: string
+        }
+        Insert: {
+          created_at?: string | null
+          key_name: string
+          key_value: string
+        }
+        Update: {
+          created_at?: string | null
+          key_name?: string
+          key_value?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
