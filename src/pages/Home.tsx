@@ -108,13 +108,14 @@ export const Home = () => {
     queryFn: () => tmdbApi.getOTTTVShows('popularity.desc'),
   });
 
+  // Fetch upcoming movies - use same endpoint as View More page for consistency
   const {
     data: upcomingMovies,
     isLoading: upcomingMoviesLoading,
     error: upcomingMoviesError,
   } = useQuery({
-    queryKey: ["upcoming-ott-movies"],
-    queryFn: tmdbApi.getUpcomingOTTMovies,
+    queryKey: ["upcoming-movies"],
+    queryFn: tmdbApi.getUpcomingMovies,
   });
 
   const {
