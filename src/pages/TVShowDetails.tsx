@@ -368,6 +368,36 @@ export const TVShowDetails = () => {
               </div>
             )}
 
+            {/* Networks - Display broadcasting/streaming platforms for the show */}
+            {show.networks && show.networks.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Tv className="h-5 w-5 text-primary" />
+                  <h2 className="text-xl font-semibold text-foreground">Networks</h2>
+                </div>
+                <div className="flex flex-wrap gap-4">
+                  {show.networks.map((network) => (
+                    <div key={network.id} className="flex flex-col items-center gap-2 group">
+                      {network.logo_path ? (
+                        <img
+                          src={getImageUrl(network.logo_path, 'w300')}
+                          alt={network.name}
+                          className="h-12 w-auto max-w-[100px] object-contain bg-white/90 rounded-lg p-2 group-hover:scale-110 transition-transform duration-200"
+                        />
+                      ) : (
+                        <div className="h-12 px-4 flex items-center justify-center bg-muted rounded-lg">
+                          <span className="text-sm font-medium text-foreground">{network.name}</span>
+                        </div>
+                      )}
+                      <span className="text-xs text-center font-medium text-muted-foreground max-w-[100px] truncate">
+                        {network.name}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Production Companies */}
             {show.production_companies && show.production_companies.length > 0 && (
               <div>

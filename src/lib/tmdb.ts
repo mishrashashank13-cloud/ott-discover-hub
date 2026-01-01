@@ -66,7 +66,7 @@ export interface MovieDetails extends Movie {
 }
 
 /**
- * Extended TV show details including seasons, episodes, and production info
+ * Extended TV show details including seasons, episodes, production info, and networks
  */
 export interface TVShowDetails extends TVShow {
   genres: { id: number; name: string }[];
@@ -76,6 +76,8 @@ export interface TVShowDetails extends TVShow {
   production_companies: { id: number; name: string; logo_path: string }[];
   spoken_languages: { english_name: string; iso_639_1: string; name: string }[];
   original_language: string;
+  // Networks are the broadcasting/streaming platforms where the show airs (e.g., Netflix, JioCinema)
+  networks: { id: number; name: string; logo_path: string; origin_country: string }[];
 }
 
 /**
