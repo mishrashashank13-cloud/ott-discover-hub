@@ -366,20 +366,28 @@ export const tmdbApi = {
 
   /**
    * Get upcoming movies that will be available on OTT platforms
+   * Uses tomorrow's date to ensure only truly upcoming movies are returned
    */
   getUpcomingOTTMovies: async (): Promise<{ results: Movie[] }> => {
-    const today = new Date().toISOString().slice(0, 10);
+    // Use tomorrow's date to filter out movies already released
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().slice(0, 10);
     const ottProviders = '8|119|122|337|463|531';
-    return proxyFetch(`/discover/movie?with_watch_providers=${encodeURIComponent(ottProviders)}&watch_region=IN&primary_release_date_gte=${today}&sort_by=primary_release_date.asc`);
+    return proxyFetch(`/discover/movie?with_watch_providers=${encodeURIComponent(ottProviders)}&watch_region=IN&primary_release_date.gte=${tomorrowStr}&sort_by=primary_release_date.asc`);
   },
 
   /**
    * Get upcoming TV shows that will be available on OTT platforms
+   * Uses tomorrow's date to ensure only truly upcoming shows are returned
    */
   getUpcomingOTTTVShows: async (): Promise<{ results: TVShow[] }> => {
-    const today = new Date().toISOString().slice(0, 10);
+    // Use tomorrow's date to filter out shows already aired
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().slice(0, 10);
     const ottProviders = '8|119|122|337|463|531';
-    return proxyFetch(`/discover/tv?with_watch_providers=${encodeURIComponent(ottProviders)}&watch_region=IN&first_air_date_gte=${today}&sort_by=first_air_date.asc`);
+    return proxyFetch(`/discover/tv?with_watch_providers=${encodeURIComponent(ottProviders)}&watch_region=IN&first_air_date.gte=${tomorrowStr}&sort_by=first_air_date.asc`);
   },
 };
 

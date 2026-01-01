@@ -149,15 +149,21 @@ serve(async (req) => {
       responseData = await tmdbMultiPage('/trending/all/week?region=IN');
     }
     // =========================================================================
-    // Upcoming endpoints
+    // Upcoming endpoints - Filter for future releases only (release_date > today)
     // =========================================================================
     else if (path === '/upcoming/movie') {
-      const today = new Date().toISOString().slice(0, 10);
-      responseData = await tmdbMultiPage(`/discover/movie?region=IN&primary_release_date.gte=${today}&sort_by=primary_release_date.asc`);
+      // Use tomorrow's date to ensure we only get truly upcoming movies
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+      responseData = await tmdbMultiPage(`/discover/movie?region=IN&primary_release_date.gte=${tomorrowStr}&sort_by=primary_release_date.asc`);
     }
     else if (path === '/upcoming/tv') {
-      const today = new Date().toISOString().slice(0, 10);
-      responseData = await tmdbMultiPage(`/discover/tv?watch_region=IN&first_air_date.gte=${today}&sort_by=first_air_date.asc`);
+      // Use tomorrow's date to ensure we only get truly upcoming TV shows
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+      responseData = await tmdbMultiPage(`/discover/tv?watch_region=IN&first_air_date.gte=${tomorrowStr}&sort_by=first_air_date.asc`);
     }
     // =========================================================================
     // Popular endpoints
