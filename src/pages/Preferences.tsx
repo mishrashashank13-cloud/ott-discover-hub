@@ -305,12 +305,154 @@ export const Preferences = () => {
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Your Preferences</h1>
         <p className="text-muted-foreground">
-          Discover new classics and manage your liked/disliked content
+          Manage your liked/disliked content and discover new classics
         </p>
       </div>
 
-      {/* Discover Classics Section - Browse and rate new content */}
+      {/* Liked Content Section - Displayed at the top */}
       <Card className="mb-8">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Heart className="h-5 w-5 text-red-500" />
+            Liked Content ({likedContent.length})
+          </CardTitle>
+          <CardDescription>
+            Content you've shown interest in
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {likedContent.length === 0 ? (
+            <p className="text-muted-foreground text-center py-8">
+              No liked content yet. Start exploring and like content you enjoy!
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {likedContent.map((preference) => (
+                <Card 
+                  key={preference.id}
+                  className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
+                >
+                  <div 
+                    onClick={() => handleContentClick(preference.content_type, preference.content_id)}
+                  >
+                    {preference.poster_path ? (
+                      <img
+                        src={`https://image.tmdb.org/t/p/w500${preference.poster_path}`}
+                        alt={preference.content_title || 'Content poster'}
+                        className="w-full h-48 object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-48 bg-muted flex items-center justify-center">
+                        {preference.content_type === 'movie' ? (
+                          <Film className="h-16 w-16 text-muted-foreground" />
+                        ) : (
+                          <Tv className="h-16 w-16 text-muted-foreground" />
+                        )}
+                      </div>
+                    )}
+                    <CardContent className="p-4">
+                      <h3 className="font-semibold line-clamp-2 mb-2">
+                        {preference.content_title || 'Unknown Title'}
+                      </h3>
+                      <p className="text-sm text-muted-foreground capitalize">
+                        {preference.content_type}
+                      </p>
+                    </CardContent>
+                  </div>
+                  <div className="px-4 pb-4">
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="w-full"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(preference.id);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Remove
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Disliked Content Section - Displayed in the middle */}
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ThumbsDown className="h-5 w-5 text-muted-foreground" />
+            Disliked Content ({dislikedContent.length})
+          </CardTitle>
+          <CardDescription>
+            Content you're not interested in
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {dislikedContent.length === 0 ? (
+            <p className="text-muted-foreground text-center py-8">
+              No disliked content yet.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {dislikedContent.map((preference) => (
+                <Card 
+                  key={preference.id}
+                  className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
+                >
+                  <div 
+                    onClick={() => handleContentClick(preference.content_type, preference.content_id)}
+                  >
+                    {preference.poster_path ? (
+                      <img
+                        src={`https://image.tmdb.org/t/p/w500${preference.poster_path}`}
+                        alt={preference.content_title || 'Content poster'}
+                        className="w-full h-48 object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-48 bg-muted flex items-center justify-center">
+                        {preference.content_type === 'movie' ? (
+                          <Film className="h-16 w-16 text-muted-foreground" />
+                        ) : (
+                          <Tv className="h-16 w-16 text-muted-foreground" />
+                        )}
+                      </div>
+                    )}
+                    <CardContent className="p-4">
+                      <h3 className="font-semibold line-clamp-2 mb-2">
+                        {preference.content_title || 'Unknown Title'}
+                      </h3>
+                      <p className="text-sm text-muted-foreground capitalize">
+                        {preference.content_type}
+                      </p>
+                    </CardContent>
+                  </div>
+                  <div className="px-4 pb-4">
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="w-full"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(preference.id);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Remove
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Discover Classics Section - Browse and rate new content (at the bottom) */}
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-yellow-500" />
@@ -436,148 +578,6 @@ export const Preferences = () => {
                 })}
               </div>
             </ScrollArea>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Liked Content Section */}
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Heart className="h-5 w-5 text-red-500" />
-            Liked Content ({likedContent.length})
-          </CardTitle>
-          <CardDescription>
-            Content you've shown interest in
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {likedContent.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">
-              No liked content yet. Start exploring and like content you enjoy!
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {likedContent.map((preference) => (
-                <Card 
-                  key={preference.id}
-                  className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
-                >
-                  <div 
-                    onClick={() => handleContentClick(preference.content_type, preference.content_id)}
-                  >
-                    {preference.poster_path ? (
-                      <img
-                        src={`https://image.tmdb.org/t/p/w500${preference.poster_path}`}
-                        alt={preference.content_title || 'Content poster'}
-                        className="w-full h-48 object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-48 bg-muted flex items-center justify-center">
-                        {preference.content_type === 'movie' ? (
-                          <Film className="h-16 w-16 text-muted-foreground" />
-                        ) : (
-                          <Tv className="h-16 w-16 text-muted-foreground" />
-                        )}
-                      </div>
-                    )}
-                    <CardContent className="p-4">
-                      <h3 className="font-semibold line-clamp-2 mb-2">
-                        {preference.content_title || 'Unknown Title'}
-                      </h3>
-                      <p className="text-sm text-muted-foreground capitalize">
-                        {preference.content_type}
-                      </p>
-                    </CardContent>
-                  </div>
-                  <div className="px-4 pb-4">
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      className="w-full"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(preference.id);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Remove
-                    </Button>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Disliked Content Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ThumbsDown className="h-5 w-5 text-muted-foreground" />
-            Disliked Content ({dislikedContent.length})
-          </CardTitle>
-          <CardDescription>
-            Content you're not interested in
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {dislikedContent.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">
-              No disliked content yet.
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {dislikedContent.map((preference) => (
-                <Card 
-                  key={preference.id}
-                  className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
-                >
-                  <div 
-                    onClick={() => handleContentClick(preference.content_type, preference.content_id)}
-                  >
-                    {preference.poster_path ? (
-                      <img
-                        src={`https://image.tmdb.org/t/p/w500${preference.poster_path}`}
-                        alt={preference.content_title || 'Content poster'}
-                        className="w-full h-48 object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-48 bg-muted flex items-center justify-center">
-                        {preference.content_type === 'movie' ? (
-                          <Film className="h-16 w-16 text-muted-foreground" />
-                        ) : (
-                          <Tv className="h-16 w-16 text-muted-foreground" />
-                        )}
-                      </div>
-                    )}
-                    <CardContent className="p-4">
-                      <h3 className="font-semibold line-clamp-2 mb-2">
-                        {preference.content_title || 'Unknown Title'}
-                      </h3>
-                      <p className="text-sm text-muted-foreground capitalize">
-                        {preference.content_type}
-                      </p>
-                    </CardContent>
-                  </div>
-                  <div className="px-4 pb-4">
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      className="w-full"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(preference.id);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Remove
-                    </Button>
-                  </div>
-                </Card>
-              ))}
-            </div>
           )}
         </CardContent>
       </Card>
