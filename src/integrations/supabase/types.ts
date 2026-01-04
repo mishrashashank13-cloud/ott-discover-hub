@@ -47,6 +47,30 @@ export type Database = {
         }
         Relationships: []
       }
+      contact_submissions: {
+        Row: {
+          comments: string
+          created_at: string
+          email: string
+          id: string
+          phone_number: string | null
+        }
+        Insert: {
+          comments: string
+          created_at?: string
+          email: string
+          id?: string
+          phone_number?: string | null
+        }
+        Update: {
+          comments?: string
+          created_at?: string
+          email?: string
+          id?: string
+          phone_number?: string | null
+        }
+        Relationships: []
+      }
       internal_secrets: {
         Row: {
           created_at: string | null
