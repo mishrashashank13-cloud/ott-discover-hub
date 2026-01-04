@@ -4,7 +4,7 @@ import { MovieCard } from "@/components/MovieCard";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, TrendingUp, Film, Tv, Calendar, ArrowRight, Star, Heart, Info, HelpCircle } from "lucide-react";
+import { AlertCircle, TrendingUp, Film, Tv, Calendar, ArrowRight, Star, Heart, Info, HelpCircle, Mail } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
@@ -366,7 +366,7 @@ export const Home = () => {
           )}
         </section>
 
-        {/* Quick Links Section - About Us and How to Use */}
+        {/* Quick Links Section - About Us, How to Use, and Contact Us */}
         <section className="mb-12 py-8 border-t border-border">
           <div className="flex flex-wrap justify-center gap-6">
             <Link 
@@ -382,6 +382,13 @@ export const Home = () => {
             >
               <HelpCircle className="h-5 w-5" />
               <span className="font-medium">How to Use</span>
+            </Link>
+            <Link 
+              to="/contact" 
+              className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
+            >
+              <Mail className="h-5 w-5" />
+              <span className="font-medium">Contact Us</span>
             </Link>
           </div>
         </section>
