@@ -4,8 +4,8 @@ import { MovieCard } from "@/components/MovieCard";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, TrendingUp, Film, Tv, Calendar, ArrowRight, Star, Heart } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { AlertCircle, TrendingUp, Film, Tv, Calendar, ArrowRight, Star, Heart, Info, HelpCircle } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState, useMemo } from "react";
@@ -364,6 +364,26 @@ export const Home = () => {
               ))}
             </div>
           )}
+        </section>
+
+        {/* Quick Links Section - About Us and How to Use */}
+        <section className="mb-12 py-8 border-t border-border">
+          <div className="flex flex-wrap justify-center gap-6">
+            <Link 
+              to="/about" 
+              className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
+            >
+              <Info className="h-5 w-5" />
+              <span className="font-medium">About Us</span>
+            </Link>
+            <Link 
+              to="/how-to-use" 
+              className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
+            >
+              <HelpCircle className="h-5 w-5" />
+              <span className="font-medium">How to Use</span>
+            </Link>
+          </div>
         </section>
       </div>
     </div>
