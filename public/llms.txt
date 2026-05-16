@@ -1,0 +1,12 @@
+# BingeGuide
+
+> BingeGuide is an OTT-focused discovery and reminder app. Track upcoming movies and TV shows across Netflix, Prime Video, Hotstar, JioCinema, SonyLiv, Zee5 and more — and never miss a release.
+
+## Pages
+
+- [Home](/): Discover trending, upcoming, and recommended OTT movies and TV shows.
+- [Search](/search): Search and filter movies and TV shows by genre, language, platform, and year.
+- [About](/about): BingeGuide's vision, mission, and what we stand for.
+- [How to Use](/how-to-use): Step-by-step guide to signing up, setting reminders, and personalizing recommendations.
+- [Contact](/contact): Get in touch via email or our contact form.
+- [Sign In](/auth): Sign in or create a BingeGuide account.
