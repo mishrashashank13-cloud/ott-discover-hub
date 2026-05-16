@@ -144,8 +144,38 @@ export const MovieDetails = () => {
     });
   };
 
+  // Truncate the overview to a safe meta-description length (max 160 chars).
+  const metaDescription = (movie.overview || `${movie.title} — movie details, cast and watch options on BingeGuide.`)
+    .slice(0, 157)
+    .trim();
+
   return (
     <div className="min-h-screen bg-background">
+      {/* Per-route SEO tags + Movie JSON-LD for rich search results. */}
+      <SEO
+        title={`${movie.title} — Movie Details | BingeGuide`.slice(0, 60)}
+        description={metaDescription}
+        path={`/movie/${movie.id}`}
+        ogType="video.movie"
+        image={movie.poster_path ? getImageUrl(movie.poster_path, 'w500') : undefined}
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "Movie",
+          name: movie.title,
+          description: movie.overview,
+          image: movie.poster_path ? getImageUrl(movie.poster_path, 'w500') : undefined,
+          datePublished: movie.release_date || undefined,
+          genre: movie.genres?.map((g) => g.name),
+          aggregateRating: movie.vote_count
+            ? {
+                "@type": "AggregateRating",
+                ratingValue: movie.vote_average,
+                ratingCount: movie.vote_count,
+                bestRating: 10,
+              }
+            : undefined,
+        }}
+      />
       {/* Backdrop */}
       {movie.backdrop_path && (
         <div 
