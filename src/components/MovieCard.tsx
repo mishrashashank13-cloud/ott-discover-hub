@@ -29,7 +29,9 @@ export const MovieCard = ({ item, className }: MovieCardProps) => {
       <div className="relative aspect-[2/3] overflow-hidden">
         <img
           src={getImageUrl(item.poster_path, 'w500')}
-          alt={title}
+          // Alt text includes media type so screen readers get a meaningful
+          // 2+ word description even for short titles ("Joker movie poster").
+          alt={`${title} ${isMovie(item) ? 'movie' : 'TV show'} poster`}
           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
           loading="lazy"
         />
