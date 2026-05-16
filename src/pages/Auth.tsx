@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { PreferencesStep } from '@/components/PreferencesStep';
 import { RankingStep } from '@/components/RankingStep';
 import { z } from 'zod';
+import { SEO } from '@/components/SEO';
 
 // =============================================================================
 // VALIDATION SCHEMAS
@@ -296,6 +297,11 @@ export const Auth = () => {
   // ===========================================================================
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <SEO
+        title="Sign In to BingeGuide"
+        description="Sign in or create your BingeGuide account to track OTT releases, set reminders, and get personalized movie and TV show recommendations."
+        path="/auth"
+      />
       <div className="w-full max-w-md space-y-6">
         {/* Header with logo and back navigation */}
         <div className="text-center space-y-4">
@@ -312,6 +318,8 @@ export const Auth = () => {
               BingeGuide
             </span>
           </div>
+          {/* Page H1 — describes the purpose of the auth page for screen readers and SEO. */}
+          <h1 className="text-2xl font-bold text-foreground">Sign In to BingeGuide</h1>
           <p className="text-muted-foreground">
             Join the community to track your favorites and get personalized recommendations
           </p>
