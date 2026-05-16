@@ -11,6 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertCircle, Search as SearchIcon, TrendingUp, Film, Tv, Calendar } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { sortByUserPreferences, UserPreferences } from "@/lib/contentSorting";
+import { SEO } from "@/components/SEO";
 
 export const Search = () => {
   const [searchParams] = useSearchParams();
@@ -170,6 +171,11 @@ export const Search = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO
+        title="Search Movies & TV Shows — BingeGuide"
+        description="Search for movies and TV shows across all major OTT platforms. Filter by genre, language, platform, and release year on BingeGuide."
+        path="/search"
+      />
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="max-w-2xl mx-auto mb-12">

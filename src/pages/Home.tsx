@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState, useMemo } from "react";
 import { sortByUserPreferences, UserPreferences } from "@/lib/contentSorting";
 import { logger } from "@/lib/logger";
+import { SEO } from "@/components/SEO";
 
 export const Home = () => {
   const navigate = useNavigate();
@@ -205,7 +206,23 @@ export const Home = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Per-route SEO tags — unique title/description/canonical for the homepage. */}
+      <SEO
+        title="BingeGuide: Your OTT Content Tracker and Reminder"
+        description="Discover, track, and get release reminders for movies and TV shows across Netflix, Prime Video, Hotstar, JioCinema and other OTT platforms."
+        path="/"
+      />
       <div className="container mx-auto px-4 py-8">
+
+        {/* Page H1 — describes the whole page and appears first in reading order. */}
+        <header className="mb-10">
+          <h1 className="text-3xl md:text-4xl font-bold text-foreground">
+            BingeGuide: Your OTT Content Tracker and Reminder
+          </h1>
+          <p className="mt-2 text-muted-foreground">
+            Browse trending, upcoming, and recommended OTT releases — all in one place.
+          </p>
+        </header>
 
         {/* Personalized Recommendations */}
         {userId && genreIds.length > 0 && (
@@ -250,7 +267,7 @@ export const Home = () => {
         <section className="mb-16">
           <div className="flex items-center gap-3 mb-8">
             <Star className="h-8 w-8 text-primary fill-primary" />
-            <h1 className="text-4xl font-bold text-foreground">Most Anticipated Releases</h1>
+            <h2 className="text-4xl font-bold text-foreground">Most Anticipated Releases</h2>
           </div>
           
           {trendingMoviesLoading || trendingTVLoading ? (

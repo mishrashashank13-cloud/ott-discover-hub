@@ -8,6 +8,7 @@
 
 import { Target, Eye, Heart, Users, Globe, Bell } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { SEO } from "@/components/SEO";
 
 /**
  * Main About Us page component
@@ -16,6 +17,11 @@ import { Card, CardContent } from "@/components/ui/card";
 export const AboutUs = () => {
   return (
     <div className="min-h-screen bg-background pt-20 pb-12 px-4">
+      <SEO
+        title="About BingeGuide — Vision, Mission & What We Stand For"
+        description="Learn about BingeGuide's vision and mission to help viewers discover, track, and never miss new OTT releases across all major streaming platforms."
+        path="/about"
+      />
       <div className="container mx-auto max-w-4xl">
         
         {/* Page Header Section */}

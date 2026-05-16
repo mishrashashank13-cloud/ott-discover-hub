@@ -4,18 +4,47 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="/lovable-uploads/9edc7871-f7a6-43df-a0a3-5d615c245270.png" type="image/png">
-    <title>BingeGuide - Discover Movies & TV Shows</title>
-    <meta name="description" content="Discover trending movies and TV shows from around the world with BingeGuide. Search, explore, and find your next favorite entertainment." />
-    <meta name="author" content="CineStream" />
 
-    <meta property="og:title" content="BingeGuide - Discover Movies & TV Shows" />
-    <meta property="og:description" content="Discover trending movies and TV shows from around the world with BingeGuide. Search, explore, and find your next favorite entertainment." />
+    <!--
+      Sitewide fallback head.
+      Per-route <title>, description, canonical, and og:* are set via
+      react-helmet-async in each page component (see src/components/SEO.tsx).
+      These tags act as the fallback for non-JS social-preview crawlers.
+    -->
+    <title>BingeGuide: Your OTT Content Tracker and Reminder</title>
+    <meta name="description" content="BingeGuide helps you discover, track, and get reminders for movies and TV shows across Netflix, Prime Video, Hotstar, and more OTT platforms." />
+    <meta name="author" content="BingeGuide" />
+
+    <meta property="og:title" content="BingeGuide: Your OTT Content Tracker and Reminder" />
+    <meta property="og:description" content="Discover, track, and get reminders for upcoming movies and web series across all major OTT platforms." />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <meta property="og:url" content="https://bingeguide-app.lovable.app/" />
 
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@lovable_dev" />
-    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+
+    <!-- Sitewide Organization + WebSite JSON-LD for search engines -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "BingeGuide",
+        "url": "https://bingeguide-app.lovable.app/",
+        "email": "helpofbingeguide@gmail.com"
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "BingeGuide",
+        "url": "https://bingeguide-app.lovable.app/",
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": "https://bingeguide-app.lovable.app/search?q={search_term_string}",
+          "query-input": "required name=search_term_string"
+        }
+      }
+    </script>
   </head>
 
   <body>

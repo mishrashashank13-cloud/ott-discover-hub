@@ -7,6 +7,7 @@ import { Trash2, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { logger } from "@/lib/logger";
+import { SEO } from "@/components/SEO";
 
 /**
  * History Page Component
@@ -129,6 +130,11 @@ export const History = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO
+        title="Browsing History — BingeGuide"
+        description="Review the OTT movies and TV shows you've recently viewed on BingeGuide and revisit content in a single click."
+        path="/history"
+      />
       <div className="container mx-auto px-4 py-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">

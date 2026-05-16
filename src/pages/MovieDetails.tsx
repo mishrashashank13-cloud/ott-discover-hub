@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { logger } from "@/lib/logger";
+import { SEO } from "@/components/SEO";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { 
@@ -143,8 +144,38 @@ export const MovieDetails = () => {
     });
   };
 
+  // Truncate the overview to a safe meta-description length (max 160 chars).
+  const metaDescription = (movie.overview || `${movie.title} — movie details, cast and watch options on BingeGuide.`)
+    .slice(0, 157)
+    .trim();
+
   return (
     <div className="min-h-screen bg-background">
+      {/* Per-route SEO tags + Movie JSON-LD for rich search results. */}
+      <SEO
+        title={`${movie.title} — Movie Details | BingeGuide`.slice(0, 60)}
+        description={metaDescription}
+        path={`/movie/${movie.id}`}
+        ogType="video.movie"
+        image={movie.poster_path ? getImageUrl(movie.poster_path, 'w500') : undefined}
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "Movie",
+          name: movie.title,
+          description: movie.overview,
+          image: movie.poster_path ? getImageUrl(movie.poster_path, 'w500') : undefined,
+          datePublished: movie.release_date || undefined,
+          genre: movie.genres?.map((g) => g.name),
+          aggregateRating: movie.vote_count
+            ? {
+                "@type": "AggregateRating",
+                ratingValue: movie.vote_average,
+                ratingCount: movie.vote_count,
+                bestRating: 10,
+              }
+            : undefined,
+        }}
+      />
       {/* Backdrop */}
       {movie.backdrop_path && (
         <div 
@@ -224,7 +255,7 @@ export const MovieDetails = () => {
                 <div className="flex items-start gap-3">
                   <Languages className="h-5 w-5 text-primary mt-0.5" />
                   <div className="flex-1">
-                    <h3 className="font-semibold text-foreground mb-2">Audio Languages</h3>
+                    <h2 className="text-base font-semibold text-foreground mb-2">Audio Languages</h2>
                     <div className="flex flex-wrap gap-2">
                       {movie.spoken_languages.map((lang, index) => (
                         <Badge key={index} variant="outline" className="text-xs">
@@ -238,7 +269,7 @@ export const MovieDetails = () => {
                 <div className="flex items-start gap-3">
                   <Subtitles className="h-5 w-5 text-primary mt-0.5" />
                   <div className="flex-1">
-                    <h3 className="font-semibold text-foreground mb-2">Subtitles Available</h3>
+                    <h2 className="text-base font-semibold text-foreground mb-2">Subtitles Available</h2>
                     <div className="flex flex-wrap gap-2">
                       {movie.spoken_languages.map((lang, index) => (
                         <Badge key={index} variant="outline" className="text-xs">

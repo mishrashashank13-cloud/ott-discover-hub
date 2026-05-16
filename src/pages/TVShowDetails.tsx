@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { logger } from "@/lib/logger";
+import { SEO } from "@/components/SEO";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { 
@@ -136,8 +137,40 @@ export const TVShowDetails = () => {
     });
   };
 
+  // Truncate overview to a safe meta-description length (max 160 chars).
+  const metaDescription = (show.overview || `${show.name} — TV show details, cast and watch options on BingeGuide.`)
+    .slice(0, 157)
+    .trim();
+
   return (
     <div className="min-h-screen bg-background">
+      {/* Per-route SEO tags + TVSeries JSON-LD for rich search results. */}
+      <SEO
+        title={`${show.name} — TV Show Details | BingeGuide`.slice(0, 60)}
+        description={metaDescription}
+        path={`/tv/${show.id}`}
+        ogType="video.tv_show"
+        image={show.poster_path ? getImageUrl(show.poster_path, 'w500') : undefined}
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "TVSeries",
+          name: show.name,
+          description: show.overview,
+          image: show.poster_path ? getImageUrl(show.poster_path, 'w500') : undefined,
+          startDate: show.first_air_date || undefined,
+          numberOfSeasons: show.number_of_seasons,
+          numberOfEpisodes: show.number_of_episodes,
+          genre: show.genres?.map((g) => g.name),
+          aggregateRating: show.vote_count
+            ? {
+                "@type": "AggregateRating",
+                ratingValue: show.vote_average,
+                ratingCount: show.vote_count,
+                bestRating: 10,
+              }
+            : undefined,
+        }}
+      />
       {/* Backdrop */}
       {show.backdrop_path && (
         <div 
@@ -217,7 +250,7 @@ export const TVShowDetails = () => {
                 <div className="flex items-start gap-3">
                   <Languages className="h-5 w-5 text-primary mt-0.5" />
                   <div className="flex-1">
-                    <h3 className="font-semibold text-foreground mb-2">Audio Languages</h3>
+                    <h2 className="text-base font-semibold text-foreground mb-2">Audio Languages</h2>
                     <div className="flex flex-wrap gap-2">
                       {show.spoken_languages.map((lang, index) => (
                         <Badge key={index} variant="outline" className="text-xs">
@@ -231,7 +264,7 @@ export const TVShowDetails = () => {
                 <div className="flex items-start gap-3">
                   <Subtitles className="h-5 w-5 text-primary mt-0.5" />
                   <div className="flex-1">
-                    <h3 className="font-semibold text-foreground mb-2">Subtitles Available</h3>
+                    <h2 className="text-base font-semibold text-foreground mb-2">Subtitles Available</h2>
                     <div className="flex flex-wrap gap-2">
                       {show.spoken_languages.map((lang, index) => (
                         <Badge key={index} variant="outline" className="text-xs">

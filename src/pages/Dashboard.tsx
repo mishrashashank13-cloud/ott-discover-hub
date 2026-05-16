@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format, isToday, isThisWeek, parseISO } from "date-fns";
 import { logger } from "@/lib/logger";
+import { SEO } from "@/components/SEO";
 
 // Interface for reminder data structure
 interface Reminder {
@@ -138,6 +139,11 @@ export const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO
+        title="My Dashboard — BingeGuide"
+        description="View your upcoming OTT release reminders, browsing history, and personalized recommendations in your BingeGuide dashboard."
+        path="/dashboard"
+      />
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center gap-3 mb-8">
