@@ -143,14 +143,21 @@ export interface DiscoverFilters {
 const proxyFetch = async (endpoint: string): Promise<any> => {
   // Build full URL to edge function
   const url = `${EDGE_FUNCTION_URL}${endpoint}`;
-  
+
+  // Attach the Supabase publishable (anon) key so the edge function can
+  // verify the request came from a legitimate Supabase client and reject
+  // anonymous external callers (basic abuse / quota protection).
+  const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+
   const response = await fetch(url, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
+      apikey: anonKey,
+      Authorization: `Bearer ${anonKey}`,
     },
   });
-  
+
   if (!response.ok) {
     // Log error only in development mode to prevent information disclosure
     if (import.meta.env.DEV) {
@@ -158,7 +165,7 @@ const proxyFetch = async (endpoint: string): Promise<any> => {
     }
     throw new Error('Failed to fetch content data');
   }
-  
+
   return response.json();
 };
 
