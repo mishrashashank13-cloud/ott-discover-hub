@@ -14,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
+import { SEO } from "@/components/SEO";
 
 // Validation schema for contact form
 const contactSchema = z.object({
@@ -110,6 +111,11 @@ export const ContactUs = () => {
 
   return (
     <div className="min-h-screen bg-background pt-20 pb-12">
+      <SEO
+        title="Contact BingeGuide — Support, Feedback & Inquiries"
+        description="Get in touch with the BingeGuide team. Email helpofbingeguide@gmail.com or use our contact form for support, feedback, and partnership inquiries."
+        path="/contact"
+      />
       <div className="container mx-auto px-4 max-w-4xl">
         {/* Page Header */}
         <div className="text-center mb-12">
@@ -137,7 +143,7 @@ export const ContactUs = () => {
               <div className="flex items-start gap-4 p-4 bg-muted/50 rounded-lg">
                 <Mail className="h-6 w-6 text-primary mt-1" />
                 <div>
-                  <h3 className="font-semibold text-foreground">Email</h3>
+                  <h2 className="text-base font-semibold text-foreground">Email</h2>
                   <a 
                     href="mailto:helpofbingeguide@gmail.com"
                     className="text-primary hover:underline"
@@ -152,7 +158,7 @@ export const ContactUs = () => {
 
               {/* Additional Info */}
               <div className="p-4 bg-primary/10 rounded-lg">
-                <h3 className="font-semibold text-foreground mb-2">Why Contact Us?</h3>
+                <h2 className="text-base font-semibold text-foreground mb-2">Why Contact Us?</h2>
                 <ul className="text-sm text-muted-foreground space-y-2">
                   <li>• Report bugs or technical issues</li>
                   <li>• Suggest new features or improvements</li>
