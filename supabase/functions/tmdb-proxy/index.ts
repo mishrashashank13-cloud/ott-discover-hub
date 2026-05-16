@@ -126,6 +126,26 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // ---------------------------------------------------------------------------
+  // Lightweight access control:
+  // Require the caller to present the project's Supabase publishable (anon) key
+  // via either the `apikey` header or `Authorization: Bearer <key>` header.
+  // This prevents random third parties from abusing the proxy to burn through
+  // TMDB API quota, while still allowing the BingeGuide frontend (which always
+  // ships the publishable key) to call the function without a signed-in user.
+  // ---------------------------------------------------------------------------
+  const expectedKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+  const apiKeyHeader = req.headers.get('apikey') ?? '';
+  const authHeader = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
+  const presented = apiKeyHeader || authHeader;
+
+  if (!expectedKey || presented !== expectedKey) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
   try {
     const url = new URL(req.url);
     const path = url.pathname.replace('/tmdb-proxy', '');
