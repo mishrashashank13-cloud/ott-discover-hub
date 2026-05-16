@@ -19,7 +19,15 @@ import { z } from 'zod';
 // Zod schemas for validating user input before submitting to Supabase
 // =============================================================================
 const emailSchema = z.string().trim().email('Invalid email address').max(255, 'Email too long');
-const passwordSchema = z.string().min(6, 'Password must be at least 6 characters').max(72, 'Password too long');
+// Strong password policy: 8+ chars with upper, lower, and number.
+// Enforced client-side; Supabase project should also enable matching policy in Auth settings.
+const passwordSchema = z
+  .string()
+  .min(8, 'Password must be at least 8 characters')
+  .max(72, 'Password too long')
+  .regex(/[A-Z]/, 'Password must contain an uppercase letter')
+  .regex(/[a-z]/, 'Password must contain a lowercase letter')
+  .regex(/[0-9]/, 'Password must contain a number');
 
 const signInSchema = z.object({
   email: emailSchema,
@@ -426,11 +434,11 @@ export const Auth = () => {
                     <Input
                       id="signup-password"
                       type="password"
-                      placeholder="Create a password (min 6 characters)"
+                      placeholder="Min 8 chars, mixed case + number"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
-                      minLength={6}
+                      minLength={8}
                       disabled={isLoading}
                     />
                   </div>
