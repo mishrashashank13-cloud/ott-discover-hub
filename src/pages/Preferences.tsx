@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { logger } from "@/lib/logger";
 import { toast as sonnerToast } from "sonner";
+import { SEO } from "@/components/SEO";
 
 // Interface for user preference data from the database
 interface UserPreference {
@@ -302,6 +303,11 @@ export const Preferences = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <SEO
+        title="Your Preferences — BingeGuide"
+        description="Manage liked and disliked OTT movies and TV shows, and discover classics to refine your BingeGuide recommendations."
+        path="/preferences"
+      />
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Your Preferences</h1>
         <p className="text-muted-foreground">
@@ -351,9 +357,9 @@ export const Preferences = () => {
                       </div>
                     )}
                     <CardContent className="p-4">
-                      <h3 className="font-semibold line-clamp-2 mb-2">
+                      <h2 className="text-base font-semibold line-clamp-2 mb-2">
                         {preference.content_title || 'Unknown Title'}
-                      </h3>
+                      </h2>
                       <p className="text-sm text-muted-foreground capitalize">
                         {preference.content_type}
                       </p>
@@ -422,9 +428,9 @@ export const Preferences = () => {
                       </div>
                     )}
                     <CardContent className="p-4">
-                      <h3 className="font-semibold line-clamp-2 mb-2">
+                      <h2 className="text-base font-semibold line-clamp-2 mb-2">
                         {preference.content_title || 'Unknown Title'}
-                      </h3>
+                      </h2>
                       <p className="text-sm text-muted-foreground capitalize">
                         {preference.content_type}
                       </p>
