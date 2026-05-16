@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { logger } from "@/lib/logger";
+import { SEO } from "@/components/SEO";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { 
@@ -224,7 +225,7 @@ export const MovieDetails = () => {
                 <div className="flex items-start gap-3">
                   <Languages className="h-5 w-5 text-primary mt-0.5" />
                   <div className="flex-1">
-                    <h3 className="font-semibold text-foreground mb-2">Audio Languages</h3>
+                    <h2 className="text-base font-semibold text-foreground mb-2">Audio Languages</h2>
                     <div className="flex flex-wrap gap-2">
                       {movie.spoken_languages.map((lang, index) => (
                         <Badge key={index} variant="outline" className="text-xs">
@@ -238,7 +239,7 @@ export const MovieDetails = () => {
                 <div className="flex items-start gap-3">
                   <Subtitles className="h-5 w-5 text-primary mt-0.5" />
                   <div className="flex-1">
-                    <h3 className="font-semibold text-foreground mb-2">Subtitles Available</h3>
+                    <h2 className="text-base font-semibold text-foreground mb-2">Subtitles Available</h2>
                     <div className="flex flex-wrap gap-2">
                       {movie.spoken_languages.map((lang, index) => (
                         <Badge key={index} variant="outline" className="text-xs">
