@@ -178,7 +178,7 @@ export const Navigation = () => {
                 size="sm"
                 asChild
               >
-                <Link to="/" className="flex items-center gap-2">
+                <Link to="/" aria-label="Home" className="flex items-center gap-2">
                   <Home className="h-4 w-4" />
                   <span className="hidden sm:inline">Home</span>
                 </Link>
@@ -190,7 +190,7 @@ export const Navigation = () => {
                   size="sm"
                   asChild
                 >
-                  <Link to="/dashboard" className="flex items-center gap-2">
+                  <Link to="/dashboard" aria-label="Dashboard" className="flex items-center gap-2">
                     <LayoutDashboard className="h-4 w-4" />
                     <span className="hidden sm:inline">Dashboard</span>
                   </Link>
@@ -202,7 +202,7 @@ export const Navigation = () => {
                 size="sm"
                 asChild
               >
-                <Link to="/search" className="flex items-center gap-2">
+                <Link to="/search" aria-label="Search" className="flex items-center gap-2">
                   <Search className="h-4 w-4" />
                   <span className="hidden sm:inline">Search</span>
                 </Link>
@@ -226,7 +226,7 @@ export const Navigation = () => {
                   size="sm"
                   asChild
                 >
-                  <Link to="/auth" className="flex items-center gap-2">
+                  <Link to="/auth" aria-label="Login" className="flex items-center gap-2">
                     <User className="h-4 w-4" />
                     <span className="hidden sm:inline">Login</span>
                   </Link>
