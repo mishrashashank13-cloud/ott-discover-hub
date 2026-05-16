@@ -24,6 +24,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { SEO } from "@/components/SEO";
 
 /**
  * Represents a single step in the how-to guide
@@ -104,8 +105,28 @@ export const HowToUse = () => {
     }
   ];
 
+  // Build FAQPage JSON-LD from the step guide so search engines can render the steps.
+  const faqJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: guideSteps.map((step) => ({
+      "@type": "Question",
+      name: step.title,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: `${step.description}. ${step.details.join('. ')}.`,
+      },
+    })),
+  };
+
   return (
     <div className="min-h-screen bg-background pt-20 pb-12 px-4">
+      <SEO
+        title="How to Use BingeGuide — OTT Tracking Step-by-Step Guide"
+        description="Step-by-step guide to BingeGuide: sign up, discover OTT content, set reminders, like or dislike titles, and personalize your watch experience."
+        path="/how-to-use"
+        jsonLd={faqJsonLd}
+      />
       <div className="container mx-auto max-w-4xl">
         
         {/* Page Header Section */}
@@ -160,9 +181,9 @@ export const HowToUse = () => {
                   
                   {/* Step Details */}
                   <div className="flex-1">
-                    <h3 className="text-xl font-bold text-foreground mb-2">
+                    <h2 className="text-xl font-bold text-foreground mb-2">
                       {step.title}
-                    </h3>
+                    </h2>
                     <p className="text-muted-foreground mb-4">
                       {step.description}
                     </p>
