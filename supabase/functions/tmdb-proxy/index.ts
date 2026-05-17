@@ -248,33 +248,27 @@ serve(async (req) => {
     // Discover endpoints (movies and TV)
     // =========================================================================
     else if (path === '/discover/movie') {
+      // Forward caller's query params first, then fill in defaults only if missing.
+      // This prevents duplicate keys (e.g. two `region=IN`) which TMDB rejects with 400.
       const params = new URLSearchParams();
-      params.append('region', 'IN');
-      
-      // Forward all query params
       searchParams.forEach((value, key) => {
         params.append(key, value);
       });
-      
-      if (!params.has('sort_by')) {
-        params.append('sort_by', 'popularity.desc');
-      }
-      
+      if (!params.has('region')) params.set('region', 'IN');
+      if (!params.has('sort_by')) params.set('sort_by', 'popularity.desc');
+
       responseData = await tmdbMultiPage(`/discover/movie?${params.toString()}`);
     }
     else if (path === '/discover/tv') {
+      // Forward caller's query params first, then fill in defaults only if missing.
+      // Avoids duplicate `watch_region` which produces a TMDB 400 "Invalid parameters".
       const params = new URLSearchParams();
-      params.append('watch_region', 'IN');
-      
-      // Forward all query params
       searchParams.forEach((value, key) => {
         params.append(key, value);
       });
-      
-      if (!params.has('sort_by')) {
-        params.append('sort_by', 'popularity.desc');
-      }
-      
+      if (!params.has('watch_region')) params.set('watch_region', 'IN');
+      if (!params.has('sort_by')) params.set('sort_by', 'popularity.desc');
+
       responseData = await tmdbMultiPage(`/discover/tv?${params.toString()}`);
     }
     // =========================================================================
