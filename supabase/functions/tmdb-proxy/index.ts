@@ -47,7 +47,7 @@ function looksLikeTmdbApiKey(value: string): boolean {
   return /^[a-f0-9]{32}$/i.test(value.trim());
 }
 
-async function tmdbRequest(endpoint: string): Promise<Response> {
+async function tmdbRequest(endpoint: string): Promise<any> {
   // Read secrets from the Edge Function environment (server-side only).
   const rawAccessToken = Deno.env.get('TMDB_ACCESS_TOKEN') ?? '';
   const rawApiKey = Deno.env.get('TMDB_API_KEY') ?? '';
@@ -76,7 +76,12 @@ async function tmdbRequest(endpoint: string): Promise<Response> {
     const useAccessToken = Boolean(accessToken && !accessTokenDisabled && !accessTokenIsActuallyApiKey);
 
     const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
-    const headers: Record<string, string> = { Accept: 'application/json' };
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      // Ask TMDB for an uncompressed payload to reduce edge-runtime body
+      // decoding issues that have been surfacing as "unexpected end of file".
+      'Accept-Encoding': 'identity',
+    };
 
     if (useAccessToken) {
       headers.Authorization = `Bearer ${accessToken}`;
@@ -106,7 +111,12 @@ async function tmdbRequest(endpoint: string): Promise<Response> {
 
       const retryUrl = new URL(`${TMDB_BASE_URL}${endpoint}`);
       retryUrl.searchParams.set('api_key', fallbackApiKey);
-      response = await fetch(retryUrl.toString(), { headers: { Accept: 'application/json' } });
+      response = await fetch(retryUrl.toString(), {
+        headers: {
+          Accept: 'application/json',
+          'Accept-Encoding': 'identity',
+        },
+      });
     }
 
     if (!response.ok) {
@@ -144,12 +154,7 @@ async function tmdbRequest(endpoint: string): Promise<Response> {
         throw new Error('TMDB response body was empty');
       }
 
-      const parsedJson = JSON.parse(responseText);
-
-      return new Response(JSON.stringify(parsedJson), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return JSON.parse(responseText);
     } catch (unknownError) {
       const safeMessage = unknownError instanceof Error ? unknownError.message : String(unknownError);
       const normalizedMessage = safeMessage.toLowerCase();
@@ -179,8 +184,7 @@ async function tmdbMultiPage(endpoint: string, pages: number = 3): Promise<any> 
   
   for (let page = 1; page <= pages; page++) {
     const separator = endpoint.includes('?') ? '&' : '?';
-    const response = await tmdbRequest(`${endpoint}${separator}page=${page}`);
-    const data = await response.json();
+    const data = await tmdbRequest(`${endpoint}${separator}page=${page}`);
     
     if (data.results) {
       allResults.push(...data.results);
@@ -278,44 +282,37 @@ serve(async (req) => {
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-      const response = await tmdbRequest(`/search/multi?query=${encodeURIComponent(query)}&region=IN`);
-      responseData = await response.json();
+      responseData = await tmdbRequest(`/search/multi?query=${encodeURIComponent(query)}&region=IN`);
     }
     // =========================================================================
     // Movie details and credits
     // =========================================================================
     else if (path.match(/^\/movie\/(\d+)$/)) {
       const movieId = path.split('/')[2];
-      const response = await tmdbRequest(`/movie/${movieId}?language=en-US`);
-      responseData = await response.json();
+      responseData = await tmdbRequest(`/movie/${movieId}?language=en-US`);
     }
     else if (path.match(/^\/movie\/(\d+)\/credits$/)) {
       const movieId = path.split('/')[2];
-      const response = await tmdbRequest(`/movie/${movieId}/credits`);
-      responseData = await response.json();
+      responseData = await tmdbRequest(`/movie/${movieId}/credits`);
     }
     else if (path.match(/^\/movie\/(\d+)\/watch-providers$/)) {
       const movieId = path.split('/')[2];
-      const response = await tmdbRequest(`/movie/${movieId}/watch/providers`);
-      responseData = await response.json();
+      responseData = await tmdbRequest(`/movie/${movieId}/watch/providers`);
     }
     // =========================================================================
     // TV show details and credits
     // =========================================================================
     else if (path.match(/^\/tv\/(\d+)$/)) {
       const tvId = path.split('/')[2];
-      const response = await tmdbRequest(`/tv/${tvId}?language=en-US`);
-      responseData = await response.json();
+      responseData = await tmdbRequest(`/tv/${tvId}?language=en-US`);
     }
     else if (path.match(/^\/tv\/(\d+)\/credits$/)) {
       const tvId = path.split('/')[2];
-      const response = await tmdbRequest(`/tv/${tvId}/credits`);
-      responseData = await response.json();
+      responseData = await tmdbRequest(`/tv/${tvId}/credits`);
     }
     else if (path.match(/^\/tv\/(\d+)\/watch-providers$/)) {
       const tvId = path.split('/')[2];
-      const response = await tmdbRequest(`/tv/${tvId}/watch/providers`);
-      responseData = await response.json();
+      responseData = await tmdbRequest(`/tv/${tvId}/watch/providers`);
     }
     // =========================================================================
     // Discover endpoints (movies and TV)
@@ -348,20 +345,17 @@ serve(async (req) => {
     // Genre endpoints
     // =========================================================================
     else if (path === '/genre/movie') {
-      const response = await tmdbRequest('/genre/movie/list?language=en-US');
-      responseData = await response.json();
+      responseData = await tmdbRequest('/genre/movie/list?language=en-US');
     }
     else if (path === '/genre/tv') {
-      const response = await tmdbRequest('/genre/tv/list?language=en-US');
-      responseData = await response.json();
+      responseData = await tmdbRequest('/genre/tv/list?language=en-US');
     }
     // =========================================================================
     // Watch providers endpoint
     // =========================================================================
     else if (path === '/watch-providers') {
       const region = searchParams.get('watch_region') || 'IN';
-      const response = await tmdbRequest(`/watch/providers/movie?watch_region=${region}`);
-      responseData = await response.json();
+      responseData = await tmdbRequest(`/watch/providers/movie?watch_region=${region}`);
     }
     // =========================================================================
     // Unknown endpoint
