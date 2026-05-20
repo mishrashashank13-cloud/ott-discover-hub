@@ -184,7 +184,7 @@ export const ReminderDialog = ({
 
       // 3. Save any newly provided contact details to the profile so
       //    we don't have to ask again next time.
-      const profileUpdates: Record<string, string> = {};
+      const profileUpdates: { email?: string; mobile_number?: string } = {};
       if (needsEmailInput) profileUpdates.email = emailInput.trim();
       if (needsPhoneInput) profileUpdates.mobile_number = phoneInput.trim();
       if (Object.keys(profileUpdates).length > 0) {
