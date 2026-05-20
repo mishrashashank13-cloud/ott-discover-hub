@@ -56,62 +56,118 @@ async function tmdbRequest(endpoint: string): Promise<Response> {
   const accessToken = rawAccessToken.trim().replace(/^bearer\s+/i, '');
   const apiKey = rawApiKey.trim();
   const accessTokenIsActuallyApiKey = looksLikeTmdbApiKey(accessToken);
+  const fallbackApiKey = apiKey || (accessTokenIsActuallyApiKey ? accessToken : '');
 
   if (!accessToken && !apiKey) {
     console.error('TMDB credentials are not configured (TMDB_ACCESS_TOKEN / TMDB_API_KEY missing)');
     throw new Error('TMDB credentials not configured');
   }
 
-  // Pick auth strategy: prefer v4 token unless we've already learned it's bad.
-  // If the "token" secret looks like a v3 api key, do NOT send it as Bearer.
-  const useAccessToken = accessToken && !accessTokenDisabled && !accessTokenIsActuallyApiKey;
+  /**
+   * Executes one authenticated TMDB fetch.
+   *
+   * Important:
+   * - We keep auth selection inside this helper so each retry can re-evaluate
+   *   whether the bearer token has already been disabled.
+   */
+  const runHttpRequest = async (): Promise<Response> => {
+    // Pick auth strategy: prefer v4 token unless we've already learned it's bad.
+    // If the "token" secret looks like a v3 api key, do NOT send it as Bearer.
+    const useAccessToken = Boolean(accessToken && !accessTokenDisabled && !accessTokenIsActuallyApiKey);
 
-  const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
-  const headers: Record<string, string> = { Accept: 'application/json' };
+    const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
+    const headers: Record<string, string> = { Accept: 'application/json' };
 
-  if (useAccessToken) {
-    headers.Authorization = `Bearer ${accessToken}`;
-  } else if (apiKey || accessTokenIsActuallyApiKey) {
-    // Fall back to v3 query-string auth.
-    // If TMDB_ACCESS_TOKEN was misconfigured with a v3 key, we can still recover.
-    url.searchParams.set('api_key', apiKey || accessToken);
-  } else {
-    // Access token disabled but no api key fallback exists.
-    throw new Error('TMDB access token invalid and no TMDB_API_KEY fallback configured');
+    if (useAccessToken) {
+      headers.Authorization = `Bearer ${accessToken}`;
+    } else if (fallbackApiKey) {
+      // Fall back to v3 query-string auth.
+      // If TMDB_ACCESS_TOKEN was misconfigured with a v3 key, we can still recover.
+      url.searchParams.set('api_key', fallbackApiKey);
+    } else {
+      // Access token disabled but no api key fallback exists.
+      throw new Error('TMDB access token invalid and no TMDB_API_KEY fallback configured');
+    }
+
+    console.log(`TMDB request: ${url.pathname}${url.search}`);
+
+    let response = await fetch(url.toString(), { headers });
+
+    // If v4 token is rejected and we have a v3 api key, fall back once and
+    // remember the failure so subsequent requests skip the v4 attempt entirely.
+    if (response.status === 401 && useAccessToken && fallbackApiKey) {
+      console.warn('TMDB access token returned 401; disabling token, falling back to TMDB_API_KEY');
+
+      // Fully consume the failed response before retrying.
+      // This is more robust than cancelling the body in the edge runtime.
+      try { await response.text(); } catch { /* ignore */ }
+
+      accessTokenDisabled = true;
+
+      const retryUrl = new URL(`${TMDB_BASE_URL}${endpoint}`);
+      retryUrl.searchParams.set('api_key', fallbackApiKey);
+      response = await fetch(retryUrl.toString(), { headers: { Accept: 'application/json' } });
+    }
+
+    if (!response.ok) {
+      // Capture a short snippet of TMDB's response body for debugging.
+      // (No secrets are logged here.)
+      const bodySnippet = await response
+        .text()
+        .then((t) => t.slice(0, 300))
+        .catch(() => '');
+
+      console.error(`TMDB API error: ${response.status} for ${endpoint}`);
+      if (bodySnippet) console.error(`TMDB API body (first 300 chars): ${bodySnippet}`);
+
+      throw new Error(`TMDB API error: ${response.status}`);
+    }
+
+    return response;
+  };
+
+  /**
+   * TMDB occasionally returns a truncated response body in the edge runtime,
+   * which surfaces as "unexpected end of file" while parsing JSON.
+   *
+   * To shield the frontend from these transient failures, we retry a few times
+   * and only return a Response after the JSON payload has been fully parsed.
+   */
+  const maxAttempts = 3;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const response = await runHttpRequest();
+      const responseText = await response.text();
+
+      if (!responseText.trim()) {
+        throw new Error('TMDB response body was empty');
+      }
+
+      const parsedJson = JSON.parse(responseText);
+
+      return new Response(JSON.stringify(parsedJson), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } catch (unknownError) {
+      const safeMessage = unknownError instanceof Error ? unknownError.message : String(unknownError);
+      const normalizedMessage = safeMessage.toLowerCase();
+      const isRetryableReadError = normalizedMessage.includes('unexpected end of file')
+        || normalizedMessage.includes('body was empty')
+        || normalizedMessage.includes('connection reset')
+        || normalizedMessage.includes('broken pipe');
+
+      if (isRetryableReadError && attempt < maxAttempts) {
+        console.warn(`Retrying TMDB request for ${endpoint} after transient read error (attempt ${attempt} of ${maxAttempts})`);
+        continue;
+      }
+
+      throw unknownError;
+    }
   }
 
-  console.log(`TMDB request: ${url.pathname}${url.search}`);
-
-  let response = await fetch(url.toString(), { headers });
-
-  // If v4 token is rejected and we have a v3 api key, fall back once and
-  // remember the failure so subsequent requests skip the v4 attempt entirely.
-  if (response.status === 401 && useAccessToken && apiKey) {
-    console.warn('TMDB access token returned 401; disabling token, falling back to TMDB_API_KEY');
-    // Drain the failed response body so the connection can be released cleanly.
-    try { await response.body?.cancel(); } catch { /* ignore */ }
-    accessTokenDisabled = true;
-
-    const retryUrl = new URL(`${TMDB_BASE_URL}${endpoint}`);
-    retryUrl.searchParams.set('api_key', apiKey);
-    response = await fetch(retryUrl.toString(), { headers: { Accept: 'application/json' } });
-  }
-
-  if (!response.ok) {
-    // Capture a short snippet of TMDB's response body for debugging.
-    // (No secrets are logged here.)
-    const bodySnippet = await response
-      .text()
-      .then((t) => t.slice(0, 300))
-      .catch(() => '');
-
-    console.error(`TMDB API error: ${response.status} for ${endpoint}`);
-    if (bodySnippet) console.error(`TMDB API body (first 300 chars): ${bodySnippet}`);
-
-    throw new Error(`TMDB API error: ${response.status}`);
-  }
-
-  return response;
+  throw new Error('TMDB request failed after retries');
 }
 
 /**
