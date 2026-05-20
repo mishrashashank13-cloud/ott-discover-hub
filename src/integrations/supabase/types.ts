@@ -133,7 +133,12 @@ export type Database = {
           created_at: string
           id: string
           last_notified_on: string | null
+          notified_at: string | null
+          notify_email: boolean
+          notify_whatsapp: boolean
           release_date: string
+          remind_at: string
+          retry_count: number
           updated_at: string
           user_id: string
         }
@@ -144,7 +149,12 @@ export type Database = {
           created_at?: string
           id?: string
           last_notified_on?: string | null
+          notified_at?: string | null
+          notify_email?: boolean
+          notify_whatsapp?: boolean
           release_date: string
+          remind_at: string
+          retry_count?: number
           updated_at?: string
           user_id: string
         }
@@ -155,7 +165,12 @@ export type Database = {
           created_at?: string
           id?: string
           last_notified_on?: string | null
+          notified_at?: string | null
+          notify_email?: boolean
+          notify_whatsapp?: boolean
           release_date?: string
+          remind_at?: string
+          retry_count?: number
           updated_at?: string
           user_id?: string
         }
