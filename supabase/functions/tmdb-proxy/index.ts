@@ -34,6 +34,19 @@ const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 // from intermittent TMDB connection drops on the doubled requests.
 let accessTokenDisabled = false;
 
+/**
+ * Detects whether the stored "access token" is actually just a v3 API key.
+ *
+ * Why this guard exists:
+ * - TMDB v4 access tokens are long JWT-like strings and work with Bearer auth.
+ * - TMDB v3 API keys are short 32-char hex strings and must be sent as `api_key`.
+ * - If a v3 key is accidentally saved in `TMDB_ACCESS_TOKEN`, Bearer auth will
+ *   always fail with 401 and some runtimes do not recover cleanly on the retry.
+ */
+function looksLikeTmdbApiKey(value: string): boolean {
+  return /^[a-f0-9]{32}$/i.test(value.trim());
+}
+
 async function tmdbRequest(endpoint: string): Promise<Response> {
   // Read secrets from the Edge Function environment (server-side only).
   const rawAccessToken = Deno.env.get('TMDB_ACCESS_TOKEN') ?? '';
@@ -42,6 +55,7 @@ async function tmdbRequest(endpoint: string): Promise<Response> {
   // Normalize input to avoid common copy/paste mistakes (Bearer prefix, whitespace).
   const accessToken = rawAccessToken.trim().replace(/^bearer\s+/i, '');
   const apiKey = rawApiKey.trim();
+  const accessTokenIsActuallyApiKey = looksLikeTmdbApiKey(accessToken);
 
   if (!accessToken && !apiKey) {
     console.error('TMDB credentials are not configured (TMDB_ACCESS_TOKEN / TMDB_API_KEY missing)');
@@ -49,15 +63,18 @@ async function tmdbRequest(endpoint: string): Promise<Response> {
   }
 
   // Pick auth strategy: prefer v4 token unless we've already learned it's bad.
-  const useAccessToken = accessToken && !accessTokenDisabled;
+  // If the "token" secret looks like a v3 api key, do NOT send it as Bearer.
+  const useAccessToken = accessToken && !accessTokenDisabled && !accessTokenIsActuallyApiKey;
 
   const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
   const headers: Record<string, string> = { Accept: 'application/json' };
 
   if (useAccessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
-  } else if (apiKey) {
-    url.searchParams.set('api_key', apiKey);
+  } else if (apiKey || accessTokenIsActuallyApiKey) {
+    // Fall back to v3 query-string auth.
+    // If TMDB_ACCESS_TOKEN was misconfigured with a v3 key, we can still recover.
+    url.searchParams.set('api_key', apiKey || accessToken);
   } else {
     // Access token disabled but no api key fallback exists.
     throw new Error('TMDB access token invalid and no TMDB_API_KEY fallback configured');
