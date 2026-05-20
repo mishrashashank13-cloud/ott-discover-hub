@@ -28,15 +28,18 @@ const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
  * - TMDB_ACCESS_TOKEN: TMDB v4 Read Access Token (recommended)
  * - TMDB_API_KEY: TMDB v3 API Key (fallback)
  */
+// Module-level flag: once we discover the access token is invalid, skip it
+// permanently for the lifetime of this isolate. Avoids paying the 401 + retry
+// cost on every request, which was triggering "unexpected end of file" errors
+// from intermittent TMDB connection drops on the doubled requests.
+let accessTokenDisabled = false;
+
 async function tmdbRequest(endpoint: string): Promise<Response> {
   // Read secrets from the Edge Function environment (server-side only).
   const rawAccessToken = Deno.env.get('TMDB_ACCESS_TOKEN') ?? '';
   const rawApiKey = Deno.env.get('TMDB_API_KEY') ?? '';
 
-  // Normalize input to avoid common copy/paste mistakes.
-  // Examples users often paste:
-  // - "Bearer eyJ..." (already includes the prefix)
-  // - tokens with leading/trailing spaces
+  // Normalize input to avoid common copy/paste mistakes (Bearer prefix, whitespace).
   const accessToken = rawAccessToken.trim().replace(/^bearer\s+/i, '');
   const apiKey = rawApiKey.trim();
 
@@ -45,39 +48,36 @@ async function tmdbRequest(endpoint: string): Promise<Response> {
     throw new Error('TMDB credentials not configured');
   }
 
-  // Build a proper URL object so we can safely add query params when needed.
+  // Pick auth strategy: prefer v4 token unless we've already learned it's bad.
+  const useAccessToken = accessToken && !accessTokenDisabled;
+
   const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
-  console.log(`TMDB request: ${url.pathname}${url.search}`);
+  const headers: Record<string, string> = { Accept: 'application/json' };
 
-  // For TMDB v4 token auth we use an Authorization header.
-  // For v3 API key auth we append api_key as a query parameter.
-  const headers: Record<string, string> = {
-    // TMDB expects Accept, not Content-Type, for GET requests.
-    Accept: 'application/json',
-  };
-
-  if (accessToken) {
+  if (useAccessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
-  } else {
-    // Keep the API key server-side; it never reaches the browser.
+  } else if (apiKey) {
     url.searchParams.set('api_key', apiKey);
+  } else {
+    // Access token disabled but no api key fallback exists.
+    throw new Error('TMDB access token invalid and no TMDB_API_KEY fallback configured');
   }
 
-  // Call TMDB.
-  // If the access token is present but rejected (401), we retry once with the v3 API key.
-  // This avoids hard failures when a token is misconfigured but an API key is valid.
+  console.log(`TMDB request: ${url.pathname}${url.search}`);
+
   let response = await fetch(url.toString(), { headers });
 
-  if (response.status === 401 && accessToken && apiKey) {
-    console.warn('TMDB access token returned 401; retrying with TMDB_API_KEY');
+  // If v4 token is rejected and we have a v3 api key, fall back once and
+  // remember the failure so subsequent requests skip the v4 attempt entirely.
+  if (response.status === 401 && useAccessToken && apiKey) {
+    console.warn('TMDB access token returned 401; disabling token, falling back to TMDB_API_KEY');
+    // Drain the failed response body so the connection can be released cleanly.
+    try { await response.body?.cancel(); } catch { /* ignore */ }
+    accessTokenDisabled = true;
 
-    const retryUrl = new URL(url.toString());
+    const retryUrl = new URL(`${TMDB_BASE_URL}${endpoint}`);
     retryUrl.searchParams.set('api_key', apiKey);
-
-    const retryHeaders: Record<string, string> = { ...headers };
-    delete retryHeaders.Authorization;
-
-    response = await fetch(retryUrl.toString(), { headers: retryHeaders });
+    response = await fetch(retryUrl.toString(), { headers: { Accept: 'application/json' } });
   }
 
   if (!response.ok) {
