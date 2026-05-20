@@ -197,6 +197,31 @@ async function tmdbMultiPage(endpoint: string, pages: number = 3): Promise<any> 
   return { results: allResults };
 }
 
+/**
+ * Determines whether a request is for a catalog/listing endpoint.
+ *
+ * Why this matters:
+ * - Listing surfaces on the homepage can safely degrade to an empty state.
+ * - Detail pages and credits should still fail loudly so we do not hide real bugs.
+ */
+function isCatalogRequest(path: string): boolean {
+  return [
+    '/trending/movie',
+    '/trending/tv',
+    '/trending/all',
+    '/upcoming/movie',
+    '/upcoming/tv',
+    '/popular/movie',
+    '/popular/tv',
+    '/discover/movie',
+    '/discover/tv',
+    '/search',
+    '/genre/movie',
+    '/genre/tv',
+    '/watch-providers',
+  ].includes(path);
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -382,6 +407,27 @@ serve(async (req) => {
     const safeMessage = unknownError instanceof Error ? unknownError.message : String(unknownError);
 
     console.error('TMDB proxy error:', safeMessage);
+
+    // For list/catalog requests, degrade gracefully instead of sending a hard 500.
+    // This prevents transient TMDB outages from blanking the homepage or search views.
+    const failedUrl = new URL(req.url);
+    const failedPath = failedUrl.pathname.replace('/tmdb-proxy', '');
+
+    if (isCatalogRequest(failedPath)) {
+      console.warn(`Returning fallback payload for catalog endpoint: ${failedPath}`);
+
+      return new Response(
+        JSON.stringify({
+          results: [],
+          fallback: true,
+          error: 'Temporarily unavailable',
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
 
     return new Response(
       JSON.stringify({ error: 'Failed to fetch content data' }),
