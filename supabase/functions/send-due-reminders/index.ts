@@ -1,22 +1,18 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
-// ============================================================
-// CORS headers for cross-origin requests from web application
-// ============================================================
+// ------------------------------------------------------------------
+// CORS — open access; the function itself is gated by X-Function-Key.
+// ------------------------------------------------------------------
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-function-key",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-function-key",
 };
 
-// ============================================================
-// Type definitions for database records
-// ============================================================
-
-/**
- * Reminder record from the 'reminders' table
- * Contains content release info and notification status
- */
+// ------------------------------------------------------------------
+// Database record shapes (only the fields we use).
+// ------------------------------------------------------------------
 interface Reminder {
   id: string;
   user_id: string;
@@ -24,149 +20,91 @@ interface Reminder {
   content_title: string;
   content_type: string;
   release_date: string;
-  last_notified_on: string | null;
+  remind_at: string;
+  notify_email: boolean;
+  notify_whatsapp: boolean;
+  notified_at: string | null;
+  retry_count: number;
 }
 
-/**
- * User profile record from the 'profiles' table
- * Contains user contact information for notifications
- */
 interface Profile {
   user_id: string;
   email: string | null;
   mobile_number: string | null;
 }
 
-// ============================================================
-// Base64 encoding helper for SMTP authentication
-// ============================================================
+// Stop retrying after this many failed delivery attempts so we don't
+// hammer SMTP / WhatsApp forever for a permanently broken contact.
+const MAX_RETRIES = 5;
+
+// ------------------------------------------------------------------
+// Small helpers
+// ------------------------------------------------------------------
 function base64Encode(str: string): string {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(str);
+  const data = new TextEncoder().encode(str);
   return btoa(String.fromCharCode(...data));
 }
 
-// ============================================================
-// Constant-time comparison for secure secret comparison
-// Prevents timing attacks on authentication
-// ============================================================
 function secureCompare(a: string, b: string): boolean {
-  if (a.length !== b.length) {
-    return false;
-  }
+  if (a.length !== b.length) return false;
   let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
+  for (let i = 0; i < a.length; i++) result |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return result === 0;
 }
 
-// ============================================================
-// SMTP Email Sending Function (Raw Socket Implementation)
-// Uses direct TCP/TLS connection for Gmail SMTP
-// ============================================================
-
-/**
- * Sends an email using raw SMTP commands over TLS
- * Gmail requires port 465 with implicit TLS or 587 with STARTTLS
- * This uses port 465 with direct TLS connection for better compatibility
- * @param to - Recipient email address
- * @param subject - Email subject line  
- * @param htmlContent - HTML content of the email body
- * @returns Object with success status and optional error message
- */
+// ------------------------------------------------------------------
+// Email delivery — raw TCP/TLS SMTP on port 465 (project convention).
+// ------------------------------------------------------------------
 async function sendEmailViaSMTP(
   to: string,
   subject: string,
   htmlContent: string
 ): Promise<{ success: boolean; error?: string }> {
-  // Read SMTP configuration from environment variables
   const smtpHost = Deno.env.get("SMTP_HOST");
   const smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "465");
   const smtpUser = Deno.env.get("SMTP_USER");
   const smtpPass = Deno.env.get("SMTP_PASS");
   const smtpFrom = Deno.env.get("SMTP_FROM_EMAIL");
 
-  // Validate all required SMTP settings are present
   if (!smtpHost || !smtpUser || !smtpPass || !smtpFrom) {
-    console.error("Missing SMTP configuration. Required: SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_FROM_EMAIL");
-    return { success: false, error: "SMTP not configured properly" };
+    return { success: false, error: "SMTP not configured" };
   }
 
-  console.log(`Attempting to send email via SMTP to: ${to}`);
-  console.log(`SMTP Config - Host: ${smtpHost}, Port: ${smtpPort}`);
-
   try {
-    // Connect to SMTP server using TLS (port 465 for Gmail)
-    const conn = await Deno.connectTls({
-      hostname: smtpHost,
-      port: smtpPort,
-    });
-
+    const conn = await Deno.connectTls({ hostname: smtpHost, port: smtpPort });
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
 
-    // Helper function to send command and read response
-    async function sendCommand(cmd: string): Promise<string> {
+    async function send(cmd: string): Promise<string> {
       await conn.write(encoder.encode(cmd + "\r\n"));
       const buf = new Uint8Array(1024);
       const n = await conn.read(buf);
-      if (n === null) return "";
-      return decoder.decode(buf.subarray(0, n));
+      return n === null ? "" : decoder.decode(buf.subarray(0, n));
     }
-
-    // Helper function to just read response (for initial greeting)
-    async function readResponse(): Promise<string> {
+    async function read(): Promise<string> {
       const buf = new Uint8Array(1024);
       const n = await conn.read(buf);
-      if (n === null) return "";
-      return decoder.decode(buf.subarray(0, n));
+      return n === null ? "" : decoder.decode(buf.subarray(0, n));
     }
 
-    // Read server greeting
-    const greeting = await readResponse();
-    console.log("SMTP Greeting:", greeting.trim());
-
-    // Send EHLO
-    const ehloResp = await sendCommand(`EHLO ${smtpHost}`);
-    console.log("EHLO Response:", ehloResp.substring(0, 100));
-
-    // Authenticate using AUTH LOGIN
-    const authResp = await sendCommand("AUTH LOGIN");
-    console.log("AUTH Response:", authResp.trim());
-
-    // Send base64 encoded username
-    const userResp = await sendCommand(base64Encode(smtpUser));
-    console.log("User Response:", userResp.trim());
-
-    // Send base64 encoded password
-    const passResp = await sendCommand(base64Encode(smtpPass));
-    console.log("Pass Response:", passResp.substring(0, 50));
-
-    // Check authentication success (235 = auth successful)
+    await read(); // greeting
+    await send(`EHLO ${smtpHost}`);
+    await send("AUTH LOGIN");
+    await send(base64Encode(smtpUser));
+    const passResp = await send(base64Encode(smtpPass));
     if (!passResp.startsWith("235")) {
       conn.close();
-      return { success: false, error: `Authentication failed: ${passResp.trim()}` };
+      return { success: false, error: `SMTP auth failed: ${passResp.trim()}` };
     }
 
-    // Extract sender email from format like "Name <email>" or plain email
-    const fromEmail = smtpFrom.includes("<") 
-      ? smtpFrom.match(/<(.+)>/)?.[1] || smtpFrom 
+    const fromEmail = smtpFrom.includes("<")
+      ? smtpFrom.match(/<(.+)>/)?.[1] || smtpFrom
       : smtpFrom;
 
-    // MAIL FROM
-    const mailFromResp = await sendCommand(`MAIL FROM:<${fromEmail}>`);
-    console.log("MAIL FROM Response:", mailFromResp.trim());
+    await send(`MAIL FROM:<${fromEmail}>`);
+    await send(`RCPT TO:<${to}>`);
+    await send("DATA");
 
-    // RCPT TO
-    const rcptToResp = await sendCommand(`RCPT TO:<${to}>`);
-    console.log("RCPT TO Response:", rcptToResp.trim());
-
-    // DATA command
-    const dataResp = await sendCommand("DATA");
-    console.log("DATA Response:", dataResp.trim());
-
-    // Build and send email content
     const boundary = "----=_Part_" + Date.now();
     const emailContent = [
       `From: ${smtpFrom}`,
@@ -178,7 +116,7 @@ async function sendEmailViaSMTP(
       `--${boundary}`,
       `Content-Type: text/plain; charset=UTF-8`,
       ``,
-      `Your BingeGuide Reminders - View in HTML email client`,
+      `Your BingeGuide reminder — view in HTML email client`,
       ``,
       `--${boundary}`,
       `Content-Type: text/html; charset=UTF-8`,
@@ -189,273 +127,252 @@ async function sendEmailViaSMTP(
       `.`,
     ].join("\r\n");
 
-    const contentResp = await sendCommand(emailContent);
-    console.log("Content Response:", contentResp.trim());
-
-    // Check if email was accepted (250 = OK)
+    const contentResp = await send(emailContent);
     if (!contentResp.startsWith("250")) {
       conn.close();
-      return { success: false, error: `Email send failed: ${contentResp.trim()}` };
+      return { success: false, error: `SMTP send failed: ${contentResp.trim()}` };
     }
-
-    // QUIT
-    await sendCommand("QUIT");
+    await send("QUIT");
     conn.close();
-
-    console.log(`Email sent successfully to ${to} via SMTP`);
     return { success: true };
   } catch (error) {
-    console.error(`SMTP email sending failed for ${to}:`, error);
-    return { success: false, error: error.message };
+    return { success: false, error: (error as Error).message };
   }
 }
 
-// ============================================================
-// Main Edge Function Handler
-// Processes due reminders and sends email notifications
-// ============================================================
+// ------------------------------------------------------------------
+// WhatsApp delivery — Meta WhatsApp Cloud API.
+// Tries the named template first (works outside the 24h session);
+// falls back to a plain text message if the template is missing.
+// ------------------------------------------------------------------
+async function sendWhatsApp(
+  toPhone: string,
+  contentTitle: string,
+  contentType: string
+): Promise<{ success: boolean; error?: string }> {
+  const token = Deno.env.get("WHATSAPP_TOKEN");
+  const phoneId = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID");
+  if (!token || !phoneId) {
+    return { success: false, error: "WhatsApp not configured" };
+  }
+
+  // WhatsApp expects phone numbers without the leading "+".
+  const cleanPhone = toPhone.replace(/^\+/, "").replace(/\D/g, "");
+  const url = `https://graph.facebook.com/v20.0/${phoneId}/messages`;
+
+  // Attempt 1: pre-approved template "bingeguide_reminder" with title param.
+  const templateBody = {
+    messaging_product: "whatsapp",
+    to: cleanPhone,
+    type: "template",
+    template: {
+      name: "bingeguide_reminder",
+      language: { code: "en_US" },
+      components: [
+        { type: "body", parameters: [{ type: "text", text: contentTitle }] },
+      ],
+    },
+  };
+
+  try {
+    let res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(templateBody),
+    });
+
+    if (res.ok) return { success: true };
+
+    // If template is unknown / not approved, fall back to a text message.
+    // This only works for users currently in a 24h session with the number.
+    const errBody = await res.text();
+    console.warn("WhatsApp template send failed, trying text fallback:", errBody);
+
+    const textBody = {
+      messaging_product: "whatsapp",
+      to: cleanPhone,
+      type: "text",
+      text: {
+        body: `BingeGuide reminder: "${contentTitle}" (${contentType}) is here. Enjoy!`,
+      },
+    };
+    res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(textBody),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      return { success: false, error: `WhatsApp API ${res.status}: ${text}` };
+    }
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+}
+
+// ------------------------------------------------------------------
+// Main handler
+// ------------------------------------------------------------------
 serve(async (req) => {
-  // Handle CORS preflight requests (OPTIONS method)
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log("Starting send-due-reminders function");
-
-    // --------------------------------------------------------
-    // SECURITY: Verify API key authentication
-    // The function requires a valid X-Function-Key header to prevent
-    // unauthorized access and potential DoS/spam attacks
-    // --------------------------------------------------------
+    // Function key auth (same pattern as before).
     const functionSecret = Deno.env.get("REMINDER_FUNCTION_SECRET");
-    const requestKey = req.headers.get("X-Function-Key") || req.headers.get("x-function-key");
-
-    // If secret is configured, require authentication
+    const requestKey =
+      req.headers.get("X-Function-Key") || req.headers.get("x-function-key");
     if (functionSecret) {
       if (!requestKey || !secureCompare(requestKey, functionSecret)) {
-        console.log("Unauthorized request - invalid or missing function key");
-        return new Response(
-          JSON.stringify({ error: "Unauthorized - valid X-Function-Key header required" }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
-      console.log("Request authenticated successfully");
-    } else {
-      // Log warning if no secret is configured (development mode)
-      console.warn("WARNING: REMINDER_FUNCTION_SECRET not configured - running without authentication");
     }
 
-    // --------------------------------------------------------
-    // Parse request body for optional parameters
-    // - force: boolean - bypass date/notification checks
-    // - reminderId: string - process specific reminder only
-    // --------------------------------------------------------
+    // Optional body for force/test mode.
     let forceMode = false;
     let specificReminderId: string | null = null;
-    
     try {
       const body = await req.json();
-      console.log("Request body received:", JSON.stringify(body));
       forceMode = body?.force === true;
       specificReminderId = body?.reminderId || null;
-      console.log(`Parsed - Force mode: ${forceMode}, Specific reminder ID: ${specificReminderId}`);
-    } catch (parseError) {
-      // No body or invalid JSON is acceptable, continue with defaults
-      console.log("No body or invalid JSON, using defaults");
+    } catch (_) {
+      /* empty body is fine */
     }
 
-    // --------------------------------------------------------
-    // Initialize Supabase client with service role key
-    // Service role bypasses RLS for admin operations
-    // --------------------------------------------------------
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Get today's date in ISO format (YYYY-MM-DD) for filtering
-    const today = new Date().toISOString().split('T')[0];
-    console.log(`Checking for reminders due on: ${today}`);
-
-    // --------------------------------------------------------
-    // Fetch reminders based on mode
-    // Normal: only reminders due today that haven't been notified
-    // Force: all reminders (or specific one) regardless of status
-    // --------------------------------------------------------
-    let reminders;
-    let remindersError;
-
-    if (forceMode) {
-      console.log("Force mode enabled - bypassing date and notification checks");
-      
-      if (specificReminderId) {
-        // Fetch specific reminder by ID for targeted testing
-        const result = await supabase
-          .from("reminders")
-          .select("*")
-          .eq("id", specificReminderId);
-        reminders = result.data;
-        remindersError = result.error;
-      } else {
-        // Fetch ALL reminders for bulk testing
-        // This allows retesting even if already marked as notified
-        const result = await supabase
-          .from("reminders")
-          .select("*");
-        reminders = result.data;
-        remindersError = result.error;
-      }
-    } else {
-      // Normal mode: fetch reminders due today that haven't been notified
-      const result = await supabase
-        .from("reminders")
-        .select("*")
-        .eq("release_date", today)
-        .or(`last_notified_on.is.null,last_notified_on.neq.${today}`);
-      reminders = result.data;
-      remindersError = result.error;
+    // Fetch reminders that are due now and haven't been delivered yet.
+    let query = supabase.from("reminders").select("*");
+    if (specificReminderId) {
+      query = query.eq("id", specificReminderId);
+    } else if (!forceMode) {
+      const nowIso = new Date().toISOString();
+      query = query
+        .is("notified_at", null)
+        .lte("remind_at", nowIso)
+        .lt("retry_count", MAX_RETRIES);
     }
 
-    if (remindersError) {
-      console.error("Error fetching reminders:", remindersError);
-      throw remindersError;
-    }
+    const { data: reminders, error: remErr } = await query;
+    if (remErr) throw remErr;
 
-    console.log(`Found ${reminders?.length || 0} reminders to process`);
-
-    // Early return if no reminders to process
     if (!reminders || reminders.length === 0) {
       return new Response(
-        JSON.stringify({ message: "No reminders to process", count: 0 }),
+        JSON.stringify({ message: "No reminders due", count: 0 }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // --------------------------------------------------------
-    // Fetch user profiles for all affected users
-    // Needed to get email addresses for notifications
-    // --------------------------------------------------------
+    // Fetch contact details for the affected users.
     const userIds = [...new Set(reminders.map((r: Reminder) => r.user_id))];
-    console.log(`Processing reminders for ${userIds.length} users`);
-
-    const { data: profiles, error: profilesError } = await supabase
+    const { data: profiles, error: profErr } = await supabase
       .from("profiles")
       .select("user_id, email, mobile_number")
       .in("user_id", userIds);
-
-    if (profilesError) {
-      console.error("Error fetching profiles:", profilesError);
-      throw profilesError;
-    }
-
-    // Create lookup map for efficient profile access by user_id
-    const profileMap = new Map(
-      profiles?.map((p: Profile) => [p.user_id, p]) || []
+    if (profErr) throw profErr;
+    const profileMap = new Map<string, Profile>(
+      (profiles || []).map((p: Profile) => [p.user_id, p])
     );
 
-    // Counters for tracking processing results
     let sentCount = 0;
-    let errorCount = 0;
+    let failureCount = 0;
 
-    // --------------------------------------------------------
-    // Group reminders by user for batch processing
-    // This allows sending one email per user with all their reminders
-    // --------------------------------------------------------
-    const remindersByUser = reminders.reduce((acc: Record<string, Reminder[]>, reminder: Reminder) => {
-      if (!acc[reminder.user_id]) {
-        acc[reminder.user_id] = [];
-      }
-      acc[reminder.user_id].push(reminder);
-      return acc;
-    }, {});
+    // Process each reminder individually so partial failures only
+    // affect that one row.
+    for (const r of reminders as Reminder[]) {
+      const profile = profileMap.get(r.user_id);
+      const subject = `Reminder: ${r.content_title}`;
+      const html = `
+        <h2>Your BingeGuide reminder</h2>
+        <p><strong>${r.content_title}</strong> (${r.content_type}) is ready for you.</p>
+        <p>Open BingeGuide to start watching.</p>
+      `;
 
-    // --------------------------------------------------------
-    // Process each user's reminders and send notifications
-    // --------------------------------------------------------
-    for (const [userId, userReminders] of Object.entries(remindersByUser)) {
-      const profile = profileMap.get(userId);
+      const results: string[] = [];
+      let allOk = true;
 
-      // Skip users without email addresses
-      if (!profile?.email) {
-        console.log(`No email found for user ${userId}, skipping`);
-        continue;
-      }
-
-      try {
-        // Build email subject based on number of releases
-        const subject = userReminders.length === 1
-          ? `Reminder: ${userReminders[0].content_title} releases today!`
-          : `Reminder: ${userReminders.length} shows/movies release today!`;
-
-        // Build HTML email body with list of content
-        const bodyHtml = `
-          <h2>Your BingeGuide Reminders for Today</h2>
-          <p>The following content is releasing today:</p>
-          <ul>
-            ${userReminders.map((r: Reminder) => 
-              `<li><strong>${r.content_title}</strong> (${r.content_type})</li>`
-            ).join("")}
-          </ul>
-          <p>Don't miss out! Visit BingeGuide to watch now.</p>
-        `;
-
-        // Send email using SMTP
-        const emailResult = await sendEmailViaSMTP(profile.email, subject, bodyHtml);
-
-        // Check if email was sent successfully
-        if (!emailResult.success) {
-          console.error(`Email sending failed for ${profile.email}:`, emailResult.error);
-          errorCount += userReminders.length;
-          // Don't update last_notified_on if email failed - allows retry
-          continue;
-        }
-
-        console.log(`Email sent successfully to ${profile.email} via SMTP`);
-
-        // --------------------------------------------------------
-        // Update last_notified_on for all reminders of this user
-        // This prevents duplicate notifications on same day
-        // --------------------------------------------------------
-        const reminderIds = userReminders.map((r: Reminder) => r.id);
-        const { error: updateError } = await supabase
-          .from("reminders")
-          .update({ last_notified_on: today })
-          .in("id", reminderIds);
-
-        if (updateError) {
-          console.error(`Error updating reminders for user ${userId}:`, updateError);
-          errorCount++;
+      // Email channel
+      if (r.notify_email) {
+        if (!profile?.email) {
+          allOk = false;
+          results.push("email: no address on file");
         } else {
-          sentCount += userReminders.length;
+          const out = await sendEmailViaSMTP(profile.email, subject, html);
+          if (!out.success) {
+            allOk = false;
+            results.push(`email: ${out.error}`);
+          } else {
+            results.push("email: ok");
+          }
         }
-      } catch (error) {
-        console.error(`Error sending notification to user ${userId}:`, error);
-        errorCount++;
+      }
+
+      // WhatsApp channel
+      if (r.notify_whatsapp) {
+        if (!profile?.mobile_number) {
+          allOk = false;
+          results.push("whatsapp: no number on file");
+        } else {
+          const out = await sendWhatsApp(
+            profile.mobile_number,
+            r.content_title,
+            r.content_type
+          );
+          if (!out.success) {
+            allOk = false;
+            results.push(`whatsapp: ${out.error}`);
+          } else {
+            results.push("whatsapp: ok");
+          }
+        }
+      }
+
+      console.log(`Reminder ${r.id}: ${results.join("; ")}`);
+
+      if (allOk) {
+        await supabase
+          .from("reminders")
+          .update({ notified_at: new Date().toISOString() })
+          .eq("id", r.id);
+        sentCount++;
+      } else {
+        await supabase
+          .from("reminders")
+          .update({ retry_count: (r.retry_count ?? 0) + 1 })
+          .eq("id", r.id);
+        failureCount++;
       }
     }
 
-    console.log(`Processed ${sentCount} reminders successfully, ${errorCount} errors`);
-
-    // Return summary of processing results
     return new Response(
       JSON.stringify({
         message: "Reminders processed",
         sent: sentCount,
-        errors: errorCount,
+        failed: failureCount,
         total: reminders.length,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    // Handle any unexpected errors in the function
-    console.error("Error in send-due-reminders function:", error);
-    return new Response(
-      JSON.stringify({ error: "Internal server error" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    console.error("send-due-reminders error:", error);
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
