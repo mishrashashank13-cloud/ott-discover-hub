@@ -34,7 +34,20 @@ const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 // from intermittent TMDB connection drops on the doubled requests.
 let accessTokenDisabled = false;
 
-async function tmdbRequest(endpoint: string): Promise<Response> {
+/**
+ * Detects whether the stored "access token" is actually just a v3 API key.
+ *
+ * Why this guard exists:
+ * - TMDB v4 access tokens are long JWT-like strings and work with Bearer auth.
+ * - TMDB v3 API keys are short 32-char hex strings and must be sent as `api_key`.
+ * - If a v3 key is accidentally saved in `TMDB_ACCESS_TOKEN`, Bearer auth will
+ *   always fail with 401 and some runtimes do not recover cleanly on the retry.
+ */
+function looksLikeTmdbApiKey(value: string): boolean {
+  return /^[a-f0-9]{32}$/i.test(value.trim());
+}
+
+async function tmdbRequest(endpoint: string): Promise<any> {
   // Read secrets from the Edge Function environment (server-side only).
   const rawAccessToken = Deno.env.get('TMDB_ACCESS_TOKEN') ?? '';
   const rawApiKey = Deno.env.get('TMDB_API_KEY') ?? '';
@@ -42,59 +55,124 @@ async function tmdbRequest(endpoint: string): Promise<Response> {
   // Normalize input to avoid common copy/paste mistakes (Bearer prefix, whitespace).
   const accessToken = rawAccessToken.trim().replace(/^bearer\s+/i, '');
   const apiKey = rawApiKey.trim();
+  const accessTokenIsActuallyApiKey = looksLikeTmdbApiKey(accessToken);
+  const fallbackApiKey = apiKey || (accessTokenIsActuallyApiKey ? accessToken : '');
 
   if (!accessToken && !apiKey) {
     console.error('TMDB credentials are not configured (TMDB_ACCESS_TOKEN / TMDB_API_KEY missing)');
     throw new Error('TMDB credentials not configured');
   }
 
-  // Pick auth strategy: prefer v4 token unless we've already learned it's bad.
-  const useAccessToken = accessToken && !accessTokenDisabled;
+  /**
+   * Executes one authenticated TMDB fetch.
+   *
+   * Important:
+   * - We keep auth selection inside this helper so each retry can re-evaluate
+   *   whether the bearer token has already been disabled.
+   */
+  const runHttpRequest = async (): Promise<Response> => {
+    // Pick auth strategy: prefer v4 token unless we've already learned it's bad.
+    // If the "token" secret looks like a v3 api key, do NOT send it as Bearer.
+    const useAccessToken = Boolean(accessToken && !accessTokenDisabled && !accessTokenIsActuallyApiKey);
 
-  const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
-  const headers: Record<string, string> = { Accept: 'application/json' };
+    const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      // Ask TMDB for an uncompressed payload to reduce edge-runtime body
+      // decoding issues that have been surfacing as "unexpected end of file".
+      'Accept-Encoding': 'identity',
+    };
 
-  if (useAccessToken) {
-    headers.Authorization = `Bearer ${accessToken}`;
-  } else if (apiKey) {
-    url.searchParams.set('api_key', apiKey);
-  } else {
-    // Access token disabled but no api key fallback exists.
-    throw new Error('TMDB access token invalid and no TMDB_API_KEY fallback configured');
+    if (useAccessToken) {
+      headers.Authorization = `Bearer ${accessToken}`;
+    } else if (fallbackApiKey) {
+      // Fall back to v3 query-string auth.
+      // If TMDB_ACCESS_TOKEN was misconfigured with a v3 key, we can still recover.
+      url.searchParams.set('api_key', fallbackApiKey);
+    } else {
+      // Access token disabled but no api key fallback exists.
+      throw new Error('TMDB access token invalid and no TMDB_API_KEY fallback configured');
+    }
+
+    console.log(`TMDB request: ${url.pathname}${url.search}`);
+
+    let response = await fetch(url.toString(), { headers });
+
+    // If v4 token is rejected and we have a v3 api key, fall back once and
+    // remember the failure so subsequent requests skip the v4 attempt entirely.
+    if (response.status === 401 && useAccessToken && fallbackApiKey) {
+      console.warn('TMDB access token returned 401; disabling token, falling back to TMDB_API_KEY');
+
+      // Fully consume the failed response before retrying.
+      // This is more robust than cancelling the body in the edge runtime.
+      try { await response.text(); } catch { /* ignore */ }
+
+      accessTokenDisabled = true;
+
+      const retryUrl = new URL(`${TMDB_BASE_URL}${endpoint}`);
+      retryUrl.searchParams.set('api_key', fallbackApiKey);
+      response = await fetch(retryUrl.toString(), {
+        headers: {
+          Accept: 'application/json',
+          'Accept-Encoding': 'identity',
+        },
+      });
+    }
+
+    if (!response.ok) {
+      // Capture a short snippet of TMDB's response body for debugging.
+      // (No secrets are logged here.)
+      const bodySnippet = await response
+        .text()
+        .then((t) => t.slice(0, 300))
+        .catch(() => '');
+
+      console.error(`TMDB API error: ${response.status} for ${endpoint}`);
+      if (bodySnippet) console.error(`TMDB API body (first 300 chars): ${bodySnippet}`);
+
+      throw new Error(`TMDB API error: ${response.status}`);
+    }
+
+    return response;
+  };
+
+  /**
+   * TMDB occasionally returns a truncated response body in the edge runtime,
+   * which surfaces as "unexpected end of file" while parsing JSON.
+   *
+   * To shield the frontend from these transient failures, we retry a few times
+   * and only return a Response after the JSON payload has been fully parsed.
+   */
+  const maxAttempts = 3;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const response = await runHttpRequest();
+      const responseText = await response.text();
+
+      if (!responseText.trim()) {
+        throw new Error('TMDB response body was empty');
+      }
+
+      return JSON.parse(responseText);
+    } catch (unknownError) {
+      const safeMessage = unknownError instanceof Error ? unknownError.message : String(unknownError);
+      const normalizedMessage = safeMessage.toLowerCase();
+      const isRetryableReadError = normalizedMessage.includes('unexpected end of file')
+        || normalizedMessage.includes('body was empty')
+        || normalizedMessage.includes('connection reset')
+        || normalizedMessage.includes('broken pipe');
+
+      if (isRetryableReadError && attempt < maxAttempts) {
+        console.warn(`Retrying TMDB request for ${endpoint} after transient read error (attempt ${attempt} of ${maxAttempts})`);
+        continue;
+      }
+
+      throw unknownError;
+    }
   }
 
-  console.log(`TMDB request: ${url.pathname}${url.search}`);
-
-  let response = await fetch(url.toString(), { headers });
-
-  // If v4 token is rejected and we have a v3 api key, fall back once and
-  // remember the failure so subsequent requests skip the v4 attempt entirely.
-  if (response.status === 401 && useAccessToken && apiKey) {
-    console.warn('TMDB access token returned 401; disabling token, falling back to TMDB_API_KEY');
-    // Drain the failed response body so the connection can be released cleanly.
-    try { await response.body?.cancel(); } catch { /* ignore */ }
-    accessTokenDisabled = true;
-
-    const retryUrl = new URL(`${TMDB_BASE_URL}${endpoint}`);
-    retryUrl.searchParams.set('api_key', apiKey);
-    response = await fetch(retryUrl.toString(), { headers: { Accept: 'application/json' } });
-  }
-
-  if (!response.ok) {
-    // Capture a short snippet of TMDB's response body for debugging.
-    // (No secrets are logged here.)
-    const bodySnippet = await response
-      .text()
-      .then((t) => t.slice(0, 300))
-      .catch(() => '');
-
-    console.error(`TMDB API error: ${response.status} for ${endpoint}`);
-    if (bodySnippet) console.error(`TMDB API body (first 300 chars): ${bodySnippet}`);
-
-    throw new Error(`TMDB API error: ${response.status}`);
-  }
-
-  return response;
+  throw new Error('TMDB request failed after retries');
 }
 
 /**
@@ -106,8 +184,7 @@ async function tmdbMultiPage(endpoint: string, pages: number = 3): Promise<any> 
   
   for (let page = 1; page <= pages; page++) {
     const separator = endpoint.includes('?') ? '&' : '?';
-    const response = await tmdbRequest(`${endpoint}${separator}page=${page}`);
-    const data = await response.json();
+    const data = await tmdbRequest(`${endpoint}${separator}page=${page}`);
     
     if (data.results) {
       allResults.push(...data.results);
@@ -205,44 +282,37 @@ serve(async (req) => {
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-      const response = await tmdbRequest(`/search/multi?query=${encodeURIComponent(query)}&region=IN`);
-      responseData = await response.json();
+      responseData = await tmdbRequest(`/search/multi?query=${encodeURIComponent(query)}&region=IN`);
     }
     // =========================================================================
     // Movie details and credits
     // =========================================================================
     else if (path.match(/^\/movie\/(\d+)$/)) {
       const movieId = path.split('/')[2];
-      const response = await tmdbRequest(`/movie/${movieId}?language=en-US`);
-      responseData = await response.json();
+      responseData = await tmdbRequest(`/movie/${movieId}?language=en-US`);
     }
     else if (path.match(/^\/movie\/(\d+)\/credits$/)) {
       const movieId = path.split('/')[2];
-      const response = await tmdbRequest(`/movie/${movieId}/credits`);
-      responseData = await response.json();
+      responseData = await tmdbRequest(`/movie/${movieId}/credits`);
     }
     else if (path.match(/^\/movie\/(\d+)\/watch-providers$/)) {
       const movieId = path.split('/')[2];
-      const response = await tmdbRequest(`/movie/${movieId}/watch/providers`);
-      responseData = await response.json();
+      responseData = await tmdbRequest(`/movie/${movieId}/watch/providers`);
     }
     // =========================================================================
     // TV show details and credits
     // =========================================================================
     else if (path.match(/^\/tv\/(\d+)$/)) {
       const tvId = path.split('/')[2];
-      const response = await tmdbRequest(`/tv/${tvId}?language=en-US`);
-      responseData = await response.json();
+      responseData = await tmdbRequest(`/tv/${tvId}?language=en-US`);
     }
     else if (path.match(/^\/tv\/(\d+)\/credits$/)) {
       const tvId = path.split('/')[2];
-      const response = await tmdbRequest(`/tv/${tvId}/credits`);
-      responseData = await response.json();
+      responseData = await tmdbRequest(`/tv/${tvId}/credits`);
     }
     else if (path.match(/^\/tv\/(\d+)\/watch-providers$/)) {
       const tvId = path.split('/')[2];
-      const response = await tmdbRequest(`/tv/${tvId}/watch/providers`);
-      responseData = await response.json();
+      responseData = await tmdbRequest(`/tv/${tvId}/watch/providers`);
     }
     // =========================================================================
     // Discover endpoints (movies and TV)
@@ -275,20 +345,17 @@ serve(async (req) => {
     // Genre endpoints
     // =========================================================================
     else if (path === '/genre/movie') {
-      const response = await tmdbRequest('/genre/movie/list?language=en-US');
-      responseData = await response.json();
+      responseData = await tmdbRequest('/genre/movie/list?language=en-US');
     }
     else if (path === '/genre/tv') {
-      const response = await tmdbRequest('/genre/tv/list?language=en-US');
-      responseData = await response.json();
+      responseData = await tmdbRequest('/genre/tv/list?language=en-US');
     }
     // =========================================================================
     // Watch providers endpoint
     // =========================================================================
     else if (path === '/watch-providers') {
       const region = searchParams.get('watch_region') || 'IN';
-      const response = await tmdbRequest(`/watch/providers/movie?watch_region=${region}`);
-      responseData = await response.json();
+      responseData = await tmdbRequest(`/watch/providers/movie?watch_region=${region}`);
     }
     // =========================================================================
     // Unknown endpoint
