@@ -9,7 +9,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState, useMemo } from "react";
-import { sortByUserPreferences, UserPreferences } from "@/lib/contentSorting";
+import { sortByUserPreferences, sortByUserPreferencesStrong, UserPreferences } from "@/lib/contentSorting";
 import { logger } from "@/lib/logger";
 import { SEO } from "@/components/SEO";
 
