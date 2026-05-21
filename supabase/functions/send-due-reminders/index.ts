@@ -227,17 +227,40 @@ serve(async (req) => {
   }
 
   try {
-    // Function key auth (same pattern as before).
-    const functionSecret = Deno.env.get("REMINDER_FUNCTION_SECRET");
+    // Create privileged Supabase client (service role) — used both for
+    // validating the function key against `internal_secrets` and for
+    // reading/updating reminders below.
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    // Function key auth — accept either the REMINDER_FUNCTION_SECRET env
+    // var OR the value stored in `internal_secrets.reminder_function_key`
+    // (which is what the pg_cron job uses). Whichever matches is fine; this
+    // keeps cron and manual invocations in sync without a redeploy.
     const requestKey =
       req.headers.get("X-Function-Key") || req.headers.get("x-function-key");
-    if (functionSecret) {
-      if (!requestKey || !secureCompare(requestKey, functionSecret)) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+    const envSecret = Deno.env.get("REMINDER_FUNCTION_SECRET") || "";
+
+    let dbSecret = "";
+    const { data: secretRow } = await supabase
+      .from("internal_secrets")
+      .select("key_value")
+      .eq("key_name", "reminder_function_key")
+      .maybeSingle();
+    if (secretRow?.key_value) dbSecret = secretRow.key_value as string;
+
+    const validKey =
+      !!requestKey &&
+      ((envSecret && secureCompare(requestKey, envSecret)) ||
+        (dbSecret && secureCompare(requestKey, dbSecret)));
+
+    if ((envSecret || dbSecret) && !validKey) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Optional body for force/test mode.
@@ -251,10 +274,6 @@ serve(async (req) => {
       /* empty body is fine */
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
 
     // Fetch reminders that are due now and haven't been delivered yet.
     let query = supabase.from("reminders").select("*");
