@@ -167,3 +167,41 @@ export const sortByUserPreferences = <T extends Movie | TVShow>(
     return scoreB - scoreA;
   });
 };
+
+/**
+ * Strong-sort variant: items that match at least one preferred language or
+ * genre are placed FIRST (ranked by score). Non-matching items follow in
+ * their original order. Guarantees preference matches always show before
+ * non-matches. If the user has no preferences (or is logged out), the
+ * original array is returned unchanged.
+ */
+export const sortByUserPreferencesStrong = <T extends Movie | TVShow>(
+  content: T[],
+  preferences: UserPreferences | null
+): T[] => {
+  if (!content) return content;
+
+  const hasPrefs =
+    !!preferences &&
+    ((preferences.language_preferences?.length || 0) > 0 ||
+      (preferences.genre_preferences?.length || 0) > 0);
+
+  if (!hasPrefs) return content;
+
+  // Bucket items into matches (score > 0) and non-matches (score = 0),
+  // preserving original order within each bucket for stable output.
+  const matched: { item: T; score: number; index: number }[] = [];
+  const unmatched: T[] = [];
+
+  content.forEach((item, index) => {
+    const score = calculatePreferenceScore(item, preferences);
+    if (score > 0) matched.push({ item, score, index });
+    else unmatched.push(item);
+  });
+
+  // Highest-scoring matches first; ties keep original order.
+  matched.sort((a, b) => b.score - a.score || a.index - b.index);
+
+  return [...matched.map((m) => m.item), ...unmatched];
+};
+
