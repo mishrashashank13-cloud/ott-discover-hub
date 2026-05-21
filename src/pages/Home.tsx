@@ -263,14 +263,17 @@ export const Home = () => {
           </>
         )}
 
-        {/* Most Anticipated Releases Hero Section */}
+        {/* Most Anticipated Releases Hero Section
+            Sourced from upcoming movies + upcoming TV (true "not yet released")
+            and preference-sorted: matches to the user's preferred languages
+            or genres appear first. */}
         <section className="mb-16">
           <div className="flex items-center gap-3 mb-8">
             <Star className="h-8 w-8 text-primary fill-primary" />
             <h2 className="text-4xl font-bold text-foreground">Most Anticipated Releases</h2>
           </div>
           
-          {trendingMoviesLoading || trendingTVLoading ? (
+          {upcomingMoviesLoading || upcomingTVLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="space-y-3">
@@ -280,24 +283,26 @@ export const Home = () => {
                 </div>
               ))}
             </div>
-          ) : trendingMoviesError && trendingTVError ? (
+          ) : upcomingMoviesError && upcomingTVError ? (
             <ErrorAlert message="Failed to load most anticipated releases" />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {[
-                ...(sortedTrendingMovies?.slice(0, 2) || []),
-                ...(sortedTrendingTVShows?.slice(0, 2) || [])
+                // Top 2 preference-matched upcoming movies + top 2 upcoming TV shows.
+                ...(filteredUpcomingMovies?.slice(0, 2) || []),
+                ...(filteredUpcomingTVShows?.slice(0, 2) || [])
               ].map((item) => (
                 <div key={item.id} className="group relative">
                   <MovieCard item={item} className="transform transition-transform duration-300 group-hover:scale-105" />
                   <Badge className="absolute top-2 right-2 bg-primary text-primary-foreground">
-                    Trending
+                    Anticipated
                   </Badge>
                 </div>
               ))}
             </div>
           )}
         </section>
+
 
         {/* Trending Movies */}
         <section className="mb-12">
