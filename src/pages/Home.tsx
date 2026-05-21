@@ -9,7 +9,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState, useMemo } from "react";
-import { sortByUserPreferences, UserPreferences } from "@/lib/contentSorting";
+import { sortByUserPreferences, sortByUserPreferencesStrong, UserPreferences } from "@/lib/contentSorting";
 import { logger } from "@/lib/logger";
 import { SEO } from "@/components/SEO";
 
@@ -128,19 +128,19 @@ export const Home = () => {
     queryFn: tmdbApi.getUpcomingTVShows,
   });
 
-  // Sort upcoming movies by user preferences (API already filters by date)
+  // Upcoming movies: strong-sort so titles matching the user's preferred
+  // languages/genres always appear first, with the rest shown after.
   const filteredUpcomingMovies = useMemo(() => {
     if (!upcomingMovies?.results) return [];
-    // API already returns upcoming movies, just sort by user preferences
-    return sortByUserPreferences(upcomingMovies.results, userPreferences);
+    return sortByUserPreferencesStrong(upcomingMovies.results, userPreferences);
   }, [upcomingMovies, userPreferences]);
 
-  // Sort upcoming TV shows by user preferences (API already filters by date)
+  // Upcoming TV shows: same strong-sort behavior as upcoming movies.
   const filteredUpcomingTVShows = useMemo(() => {
     if (!upcomingTVShows?.results) return [];
-    // API already returns upcoming shows, just sort by user preferences
-    return sortByUserPreferences(upcomingTVShows.results, userPreferences);
+    return sortByUserPreferencesStrong(upcomingTVShows.results, userPreferences);
   }, [upcomingTVShows, userPreferences]);
+
 
   // Sort trending movies by user preferences
   const sortedTrendingMovies = useMemo(() => {
@@ -263,14 +263,17 @@ export const Home = () => {
           </>
         )}
 
-        {/* Most Anticipated Releases Hero Section */}
+        {/* Most Anticipated Releases Hero Section
+            Sourced from upcoming movies + upcoming TV (true "not yet released")
+            and preference-sorted: matches to the user's preferred languages
+            or genres appear first. */}
         <section className="mb-16">
           <div className="flex items-center gap-3 mb-8">
             <Star className="h-8 w-8 text-primary fill-primary" />
             <h2 className="text-4xl font-bold text-foreground">Most Anticipated Releases</h2>
           </div>
           
-          {trendingMoviesLoading || trendingTVLoading ? (
+          {upcomingMoviesLoading || upcomingTVLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="space-y-3">
@@ -280,24 +283,26 @@ export const Home = () => {
                 </div>
               ))}
             </div>
-          ) : trendingMoviesError && trendingTVError ? (
+          ) : upcomingMoviesError && upcomingTVError ? (
             <ErrorAlert message="Failed to load most anticipated releases" />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {[
-                ...(sortedTrendingMovies?.slice(0, 2) || []),
-                ...(sortedTrendingTVShows?.slice(0, 2) || [])
+                // Top 2 preference-matched upcoming movies + top 2 upcoming TV shows.
+                ...(filteredUpcomingMovies?.slice(0, 2) || []),
+                ...(filteredUpcomingTVShows?.slice(0, 2) || [])
               ].map((item) => (
                 <div key={item.id} className="group relative">
                   <MovieCard item={item} className="transform transition-transform duration-300 group-hover:scale-105" />
                   <Badge className="absolute top-2 right-2 bg-primary text-primary-foreground">
-                    Trending
+                    Anticipated
                   </Badge>
                 </div>
               ))}
             </div>
           )}
         </section>
+
 
         {/* Trending Movies */}
         <section className="mb-12">
