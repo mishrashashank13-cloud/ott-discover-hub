@@ -128,19 +128,19 @@ export const Home = () => {
     queryFn: tmdbApi.getUpcomingTVShows,
   });
 
-  // Sort upcoming movies by user preferences (API already filters by date)
+  // Upcoming movies: strong-sort so titles matching the user's preferred
+  // languages/genres always appear first, with the rest shown after.
   const filteredUpcomingMovies = useMemo(() => {
     if (!upcomingMovies?.results) return [];
-    // API already returns upcoming movies, just sort by user preferences
-    return sortByUserPreferences(upcomingMovies.results, userPreferences);
+    return sortByUserPreferencesStrong(upcomingMovies.results, userPreferences);
   }, [upcomingMovies, userPreferences]);
 
-  // Sort upcoming TV shows by user preferences (API already filters by date)
+  // Upcoming TV shows: same strong-sort behavior as upcoming movies.
   const filteredUpcomingTVShows = useMemo(() => {
     if (!upcomingTVShows?.results) return [];
-    // API already returns upcoming shows, just sort by user preferences
-    return sortByUserPreferences(upcomingTVShows.results, userPreferences);
+    return sortByUserPreferencesStrong(upcomingTVShows.results, userPreferences);
   }, [upcomingTVShows, userPreferences]);
+
 
   // Sort trending movies by user preferences
   const sortedTrendingMovies = useMemo(() => {
