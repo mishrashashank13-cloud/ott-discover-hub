@@ -9,6 +9,8 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
+// Branded fallback artwork shown when a TMDB title has no poster/backdrop.
+import noMediaAvailable from "@/assets/no-media-available.png";
 
 // Base URL for TMDB image assets (public, no API key needed)
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p';
