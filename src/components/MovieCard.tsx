@@ -28,7 +28,10 @@ export const MovieCard = ({ item, className }: MovieCardProps) => {
     >
       <div className="relative aspect-[2/3] overflow-hidden">
         <img
-          src={getImageUrl(item.poster_path, 'w500')}
+          // Some TMDB titles (often very new releases) ship without a poster
+          // but still have a backdrop image. Falling back to the backdrop
+          // prevents these cards from rendering as a blank placeholder.
+          src={getImageUrl(item.poster_path || item.backdrop_path, 'w500')}
           // Alt text includes media type so screen readers get a meaningful
           // 2+ word description even for short titles ("Joker movie poster").
           alt={`${title} ${isMovie(item) ? 'movie' : 'TV show'} poster`}

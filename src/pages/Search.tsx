@@ -164,8 +164,9 @@ export const Search = () => {
   // This ensures the displayed count matches the actual visible items
   const results = useMemo(() => {
     if (!rawResults) return rawResults;
-    // Filter items that have a valid poster_path first, then sort by preferences
-    const filteredResults = rawResults.filter((item) => item.poster_path);
+    // Keep items that have ANY usable image (poster or backdrop). Some new
+    // TMDB titles only ship a backdrop; MovieCard now uses that as fallback.
+    const filteredResults = rawResults.filter((item) => item.poster_path || item.backdrop_path);
     return sortByUserPreferences(filteredResults, userPreferences);
   }, [rawResults, userPreferences]);
 
