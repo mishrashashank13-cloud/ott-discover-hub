@@ -9,6 +9,8 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
+// Branded fallback artwork shown when a TMDB title has no poster/backdrop.
+import noMediaAvailable from "@/assets/no-media-available.png";
 
 // Base URL for TMDB image assets (public, no API key needed)
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p';
@@ -411,7 +413,8 @@ export const tmdbApi = {
  * @returns Full URL to the image or placeholder if path is empty
  */
 export const getImageUrl = (path: string, size: 'w300' | 'w500' | 'w780' | 'original' = 'w500') => {
-  if (!path) return '/placeholder.svg';
+  // Use a branded "No Media Available" image when TMDB has no artwork for this title.
+  if (!path) return noMediaAvailable;
   return `${TMDB_IMAGE_BASE_URL}/${size}${path}`;
 };
 
