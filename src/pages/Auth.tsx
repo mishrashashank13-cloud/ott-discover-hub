@@ -329,6 +329,86 @@ export const Auth = () => {
   }
 
   // ===========================================================================
+  // FORGOT PASSWORD SCREEN
+  // Shown when user clicks "Forgot password?" on the sign-in tab.
+  // ===========================================================================
+  if (showForgotPassword) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <SEO
+          title="Forgot Password - BingeGuide"
+          description="Reset your BingeGuide account password."
+          path="/auth"
+        />
+        <div className="w-full max-w-md space-y-6">
+          <div className="text-center space-y-4">
+            <Button variant="ghost" size="sm" onClick={() => { setShowForgotPassword(false); setError(''); }} className="absolute top-4 left-4">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Sign In
+            </Button>
+
+            <div className="flex items-center justify-center gap-2">
+              <Film className="h-8 w-8 text-primary" />
+              <span className="text-2xl font-bold bg-hero-gradient bg-clip-text text-transparent">
+                BingeGuide
+              </span>
+            </div>
+            <h1 className="text-2xl font-bold text-foreground">Reset Password</h1>
+            <p className="text-muted-foreground">
+              Enter your email and we'll send you a reset link
+            </p>
+          </div>
+
+          <Card className="border-border bg-card">
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-2xl text-center flex items-center justify-center gap-2">
+                <Mail className="h-5 w-5 text-primary" />
+                Forgot Password
+              </CardTitle>
+              <CardDescription className="text-center">
+                We'll email you a link to reset your password
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="forgot-email">Email Address</Label>
+                  <Input
+                    id="forgot-email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={isLoading}
+                    required
+                  />
+                </div>
+
+                {error && (
+                  <Alert className="border-destructive/50 bg-destructive/10">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={isLoading}
+                >
+                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Send Reset Link
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // ===========================================================================
   // MAIN AUTH SCREEN
   // Email/password authentication with Google as alternative
   // ===========================================================================
