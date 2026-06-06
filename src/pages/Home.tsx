@@ -142,6 +142,88 @@ export const Home = () => {
     queryFn: () => tmdbApi.getTVShowsByGenre(genreIds),
     enabled: genreIds.length > 0,
   });
+
+  /**
+   * "Recommended for You" personalized ribbon.
+   *
+   * Builds a combined genre + top-language filter from:
+   *   1. Genres derived from the user's liked content (genreIds)
+   *   2. Profile language_preferences (top-ranked language) and
+   *      genre_preferences (all ranked genres)
+   * and then queries TMDB discover for both movies and TV shows so the
+   * ribbon can mix formats. Results already seen (in browsing_history) or
+   * already reacted to (user_preferences) are filtered out, and the final
+   * list is preference-sorted before being interleaved movie/TV.
+   */
+  const personalizedFilters = useMemo(() => {
+    // Combine genre IDs from liked content + ranked profile genre prefs.
+    const allGenreIds = new Set<number>(genreIds);
+    userPreferences?.genre_preferences?.forEach((g) => {
+      const id = GENRE_NAME_TO_ID[g.name];
+      if (id) allGenreIds.add(id);
+    });
+
+    // Pick the highest-ranked language (rank 1 = top preference).
+    const topLang = [...(userPreferences?.language_preferences || [])]
+      .sort((a, b) => a.rank - b.rank)[0]?.name;
+    const langCode = topLang ? LANGUAGE_NAME_TO_CODE[topLang] : undefined;
+
+    return {
+      genres: Array.from(allGenreIds).slice(0, 6).join(','),
+      language: langCode,
+      hasSignal: allGenreIds.size > 0 || !!langCode,
+    };
+  }, [genreIds, userPreferences]);
+
+  const {
+    data: personalizedMovies,
+    isLoading: personalizedMoviesLoading,
+  } = useQuery({
+    queryKey: ["personalized-movies", personalizedFilters.genres, personalizedFilters.language],
+    queryFn: () => tmdbApi.discoverMovies({
+      with_genres: personalizedFilters.genres || undefined,
+      with_original_language: personalizedFilters.language,
+      watch_region: 'IN',
+    }),
+    enabled: !!userId && personalizedFilters.hasSignal,
+  });
+
+  const {
+    data: personalizedTVShows,
+    isLoading: personalizedTVShowsLoading,
+  } = useQuery({
+    queryKey: ["personalized-tv", personalizedFilters.genres, personalizedFilters.language],
+    queryFn: () => tmdbApi.discoverTVShows({
+      with_genres: personalizedFilters.genres || undefined,
+      with_original_language: personalizedFilters.language,
+      watch_region: 'IN',
+    }),
+    enabled: !!userId && personalizedFilters.hasSignal,
+  });
+
+  // Merge movie + TV results, drop already-seen titles, sort by preference
+  // score, then interleave movie/TV so the ribbon visually mixes formats.
+  const personalizedRecommendations = useMemo(() => {
+    const movies = (personalizedMovies?.results || []).filter(
+      (m) => !excludedMovieIds.has(m.id)
+    );
+    const tvs = (personalizedTVShows?.results || []).filter(
+      (t) => !excludedTvIds.has(t.id)
+    );
+    const sortedMovies = sortByUserPreferences(movies, userPreferences);
+    const sortedTvs = sortByUserPreferences(tvs, userPreferences);
+
+    // Interleave: movie, tv, movie, tv, ...
+    const out: (typeof sortedMovies[number] | typeof sortedTvs[number])[] = [];
+    const max = Math.max(sortedMovies.length, sortedTvs.length);
+    for (let i = 0; i < max; i++) {
+      if (sortedMovies[i]) out.push(sortedMovies[i]);
+      if (sortedTvs[i]) out.push(sortedTvs[i]);
+    }
+    return out;
+  }, [personalizedMovies, personalizedTVShows, excludedMovieIds, excludedTvIds, userPreferences]);
+
+
   
   const {
     data: trendingMovies,
