@@ -77,15 +77,23 @@ export const Home = () => {
         
         if (preferences && preferences.length > 0) {
           const genres = new Set<number>();
-          
+          // Track IDs of titles the user has already reacted to so the
+          // "Recommended for You" ribbon can exclude them.
+          const excludedMovies = new Set<number>();
+          const excludedTv = new Set<number>();
+
           // Fetch details for each preferred content to get genre IDs
           for (const pref of preferences.slice(0, 5)) { // Limit to first 5 to avoid too many API calls
+            const numericId = Number(pref.content_id);
+            if (pref.content_type === 'movie') excludedMovies.add(numericId);
+            else if (pref.content_type === 'tv') excludedTv.add(numericId);
+
             try {
               if (pref.content_type === 'movie') {
-                const details = await tmdbApi.getMovieDetails(Number(pref.content_id));
+                const details = await tmdbApi.getMovieDetails(numericId);
                 details.genres.forEach(g => genres.add(g.id));
               } else if (pref.content_type === 'tv') {
-                const details = await tmdbApi.getTVShowDetails(Number(pref.content_id));
+                const details = await tmdbApi.getTVShowDetails(numericId);
                 details.genres.forEach(g => genres.add(g.id));
               }
             } catch (error) {
@@ -93,8 +101,23 @@ export const Home = () => {
               logger.error('Error fetching content details:', error);
             }
           }
-          
+
           setGenreIds(Array.from(genres));
+          // Also pull browsing history IDs so already-viewed titles don't
+          // appear in the personalized ribbon.
+          const { data: history } = await supabase
+            .from('browsing_history')
+            .select('content_id, content_type')
+            .eq('user_id', user.id)
+            .limit(200);
+          history?.forEach((h) => {
+            const n = Number(h.content_id);
+            if (h.content_type === 'movie') excludedMovies.add(n);
+            else if (h.content_type === 'tv') excludedTv.add(n);
+          });
+
+          setExcludedMovieIds(excludedMovies);
+          setExcludedTvIds(excludedTv);
         }
       }
     };
