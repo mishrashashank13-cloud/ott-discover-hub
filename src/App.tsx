@@ -39,6 +39,7 @@ const App = () => (
             <Route path="/movie/:id" element={<MovieDetails />} />
             <Route path="/tv/:id" element={<TVShowDetails />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/about" element={<AboutUs />} />
             <Route path="/how-to-use" element={<HowToUse />} />
             <Route path="/contact" element={<ContactUs />} />
