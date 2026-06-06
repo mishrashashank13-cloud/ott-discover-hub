@@ -11,6 +11,30 @@ import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState, useMemo } from "react";
 import { sortByUserPreferences, sortByUserPreferencesStrong, UserPreferences } from "@/lib/contentSorting";
 import { logger } from "@/lib/logger";
+import { Sparkles } from "lucide-react";
+
+/**
+ * Map of language NAMES (as stored in profile preferences) to TMDB ISO 639-1
+ * language codes. Used to translate the user's ranked language preferences
+ * into the `with_original_language` filter understood by TMDB discover APIs.
+ */
+const LANGUAGE_NAME_TO_CODE: Record<string, string> = {
+  Hindi: "hi", English: "en", Tamil: "ta", Telugu: "te", Malayalam: "ml",
+  Kannada: "kn", Bengali: "bn", Marathi: "mr", Punjabi: "pa", Gujarati: "gu",
+};
+
+/**
+ * Map of genre NAMES (as stored in profile preferences) to TMDB genre IDs.
+ * Combines movie + TV genre IDs; TMDB accepts both ID spaces in discover.
+ */
+const GENRE_NAME_TO_ID: Record<string, number> = {
+  Action: 28, Adventure: 12, Animation: 16, Comedy: 35, Crime: 80,
+  Documentary: 99, Drama: 18, Family: 10751, Fantasy: 14, History: 36,
+  Horror: 27, Music: 10402, Mystery: 9648, Romance: 10749,
+  "Science Fiction": 878, Thriller: 53, War: 10752, Western: 37,
+  "Action & Adventure": 10759, Kids: 10762, Reality: 10764,
+  "Sci-Fi & Fantasy": 10765, "War & Politics": 10768,
+};
 import { SEO } from "@/components/SEO";
 
 export const Home = () => {
