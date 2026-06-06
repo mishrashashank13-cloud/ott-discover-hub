@@ -42,6 +42,11 @@ export const Home = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const [genreIds, setGenreIds] = useState<number[]>([]);
   const [userPreferences, setUserPreferences] = useState<UserPreferences | null>(null);
+  // IDs of content the user has already liked/disliked or browsed — used to
+  // exclude already-seen items from the "Recommended for You" ribbon so the
+  // surface always feels fresh.
+  const [excludedMovieIds, setExcludedMovieIds] = useState<Set<number>>(new Set());
+  const [excludedTvIds, setExcludedTvIds] = useState<Set<number>>(new Set());
   
   // Fetch user data and preferences on component mount
   useEffect(() => {
