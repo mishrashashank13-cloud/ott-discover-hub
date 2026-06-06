@@ -55,7 +55,8 @@ export const Auth = () => {
   const [showRanking, setShowRanking] = useState(false);
   const [showPreferences, setShowPreferences] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
-  
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+   
   const navigate = useNavigate();
   const { toast } = useToast();
 
