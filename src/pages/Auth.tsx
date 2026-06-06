@@ -246,6 +246,42 @@ export const Auth = () => {
   };
 
   // ===========================================================================
+  // FORGOT PASSWORD HANDLER
+  // Sends a password-reset email via Supabase with a recovery redirect URL.
+  // ===========================================================================
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+
+    const emailResult = emailSchema.safeParse(email);
+    if (!emailResult.success) {
+      setError('Please enter a valid email address');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Check your email',
+        description: 'A password reset link has been sent to your email address.',
+      });
+      setShowForgotPassword(false);
+      setEmail('');
+    } catch (error: any) {
+      setError(error.message ?? 'Failed to send reset email');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ===========================================================================
   // CONDITIONAL RENDERS
   // Show ranking or preferences screens based on user onboarding step
   // ===========================================================================
