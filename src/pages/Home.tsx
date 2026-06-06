@@ -358,6 +358,31 @@ export const Home = () => {
           </p>
         </header>
 
+        {/* "Recommended for You" — personalized blended ribbon (logged-in only).
+            Mixes movies + TV shows derived from the user's liked content,
+            browsing history exclusions, and ranked language/genre profile
+            preferences. Hidden entirely for anonymous visitors. */}
+        {userId && personalizedFilters.hasSignal && (
+          <section className="mb-12">
+            <SectionHeader
+              icon={Sparkles}
+              title="Recommended for You"
+              onViewMore={() => navigate('/search?category=recommended')}
+            />
+            {personalizedMoviesLoading || personalizedTVShowsLoading ? (
+              <LoadingCarousel />
+            ) : personalizedRecommendations.length === 0 ? (
+              <ErrorAlert message="We're still learning your taste — like a few titles to see personalized picks." />
+            ) : (
+              <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-3">
+                {personalizedRecommendations.slice(0, 16).map((item) => (
+                  <MovieCard key={`${'title' in item ? 'm' : 't'}-${item.id}`} item={item} />
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
         {/* Personalized Recommendations */}
         {userId && genreIds.length > 0 && (
           <>
