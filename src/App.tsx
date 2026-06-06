@@ -16,6 +16,7 @@ import { History } from "./pages/History";
 import { AboutUs } from "./pages/AboutUs";
 import { HowToUse } from "./pages/HowToUse";
 import { ContactUs } from "./pages/ContactUs";
+import { ResetPassword } from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ const App = () => (
             <Route path="/movie/:id" element={<MovieDetails />} />
             <Route path="/tv/:id" element={<TVShowDetails />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/about" element={<AboutUs />} />
             <Route path="/how-to-use" element={<HowToUse />} />
             <Route path="/contact" element={<ContactUs />} />
