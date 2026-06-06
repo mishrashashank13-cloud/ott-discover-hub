@@ -16,6 +16,7 @@ import { History } from "./pages/History";
 import { AboutUs } from "./pages/AboutUs";
 import { HowToUse } from "./pages/HowToUse";
 import { ContactUs } from "./pages/ContactUs";
+import { ResetPassword } from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
