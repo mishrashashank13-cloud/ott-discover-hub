@@ -122,6 +122,16 @@ export const Home = () => {
           setExcludedMovieIds(excludedMovies);
           setExcludedTvIds(excludedTv);
         }
+
+        // Pull the user's recent browsing history to populate the
+        // "Top Picks for You" ribbon on the home page.
+        const { data: historyItems } = await supabase
+          .from('browsing_history')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('viewed_at', { ascending: false })
+          .limit(16);
+        setBrowsingHistory(historyItems || []);
       }
     };
     
