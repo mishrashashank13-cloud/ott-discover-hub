@@ -273,21 +273,33 @@ serve(async (req) => {
     // Upcoming endpoints - future releases on India OTT only
     // =========================================================================
     else if (path === '/upcoming/movie') {
+      // Upcoming titles do NOT yet have streaming providers assigned in TMDB,
+      // so filtering by `with_watch_providers` returns (almost) nothing.
+      // Scope to India by region instead, so the ribbon shows future releases
+      // that are slated for the Indian market. Once they actually go live on
+      // an OTT, the normal India-OTT provider gate kicks in on Popular/Discover.
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       const tomorrowStr = tomorrow.toISOString().slice(0, 10);
-      const params = withIndiaOttFilters(new URLSearchParams());
+      const params = new URLSearchParams();
+      params.set('region', 'IN');
+      params.set('watch_region', 'IN');
       params.set('primary_release_date.gte', tomorrowStr);
       params.set('sort_by', 'primary_release_date.asc');
+      params.set('include_adult', 'false');
       responseData = await tmdbMultiPage(`/discover/movie?${params.toString()}`);
     }
     else if (path === '/upcoming/tv') {
+      // Same reasoning as upcoming movies: providers are unknown pre-release,
+      // so we scope by region rather than by `with_watch_providers`.
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       const tomorrowStr = tomorrow.toISOString().slice(0, 10);
-      const params = withIndiaOttFilters(new URLSearchParams());
+      const params = new URLSearchParams();
+      params.set('watch_region', 'IN');
       params.set('first_air_date.gte', tomorrowStr);
       params.set('sort_by', 'first_air_date.asc');
+      params.set('include_adult', 'false');
       responseData = await tmdbMultiPage(`/discover/tv?${params.toString()}`);
     }
     // =========================================================================
