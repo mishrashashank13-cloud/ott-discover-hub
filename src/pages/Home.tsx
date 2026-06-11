@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { tmdbApi } from "@/lib/tmdb";
+import { tmdbApi, getImageUrl } from "@/lib/tmdb";
 import { MovieCard } from "@/components/MovieCard";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,6 +12,7 @@ import { useEffect, useState, useMemo } from "react";
 import { sortByUserPreferences, sortByUserPreferencesStrong, UserPreferences } from "@/lib/contentSorting";
 import { logger } from "@/lib/logger";
 import { Sparkles } from "lucide-react";
+import type { Tables } from "@/integrations/supabase/types";
 
 /**
  * Map of language NAMES (as stored in profile preferences) to TMDB ISO 639-1
