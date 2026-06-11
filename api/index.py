@@ -154,7 +154,7 @@ async def log_requests(request: Request, call_next):
 
 
 @app.get("/api/upcoming-shows")
-def upcoming_shows(page: int = Query(1, ge=1), language: str = "en-US"):
+def upcoming_shows(page: int = Query(1, ge=1), language: str = "en-US", _: bool = Depends(verify_supabase_anon_key)):
     today = date.today().isoformat()
     discover_url = f"{TMDB_BASE}/discover/tv"
     headers = {"Authorization": f"Bearer {TMDB_TOKEN}"} if TMDB_TOKEN else {}
@@ -524,43 +524,43 @@ def _tmdb_multi_page(endpoint: str, params: dict = None, max_pages: int = 5) -> 
 
 
 @app.get("/api/tmdb/trending/movie")
-def tmdb_trending_movies():
+def tmdb_trending_movies(_: bool = Depends(verify_supabase_anon_key)):
     """Get trending movies (proxied from TMDB)."""
     return _tmdb_multi_page("/trending/movie/week", {"region": "IN"})
 
 
 @app.get("/api/tmdb/trending/tv")
-def tmdb_trending_tv():
+def tmdb_trending_tv(_: bool = Depends(verify_supabase_anon_key)):
     """Get trending TV shows (proxied from TMDB)."""
     return _tmdb_multi_page("/trending/tv/week", {"region": "IN"})
 
 
 @app.get("/api/tmdb/upcoming/movie")
-def tmdb_upcoming_movies():
+def tmdb_upcoming_movies(_: bool = Depends(verify_supabase_anon_key)):
     """Get upcoming movies (proxied from TMDB)."""
     return _tmdb_multi_page("/movie/upcoming", {"region": "IN"})
 
 
 @app.get("/api/tmdb/popular/movie")
-def tmdb_popular_movies():
+def tmdb_popular_movies(_: bool = Depends(verify_supabase_anon_key)):
     """Get popular movies (proxied from TMDB)."""
     return _tmdb_multi_page("/movie/popular", {"region": "IN"})
 
 
 @app.get("/api/tmdb/popular/tv")
-def tmdb_popular_tv():
+def tmdb_popular_tv(_: bool = Depends(verify_supabase_anon_key)):
     """Get popular TV shows (proxied from TMDB)."""
     return _tmdb_multi_page("/tv/popular", {"region": "IN"})
 
 
 @app.get("/api/tmdb/trending/all")
-def tmdb_trending_all():
+def tmdb_trending_all(_: bool = Depends(verify_supabase_anon_key)):
     """Get all trending content (proxied from TMDB)."""
     return _tmdb_request("/trending/all/week", {"region": "IN"})
 
 
 @app.get("/api/tmdb/search")
-def tmdb_search(query: str = Query(..., min_length=1, max_length=200)):
+def tmdb_search(query: str = Query(..., min_length=1, max_length=200, _: bool = Depends(verify_supabase_anon_key))):
     """
     Search for movies and TV shows.
     Query parameter is validated for length to prevent abuse.
@@ -569,7 +569,7 @@ def tmdb_search(query: str = Query(..., min_length=1, max_length=200)):
 
 
 @app.get("/api/tmdb/movie/{movie_id}")
-def tmdb_movie_details(movie_id: int):
+def tmdb_movie_details(movie_id: int, _: bool = Depends(verify_supabase_anon_key)):
     """Get movie details by ID."""
     if movie_id < 1:
         raise HTTPException(status_code=400, detail="Invalid movie ID")
@@ -577,7 +577,7 @@ def tmdb_movie_details(movie_id: int):
 
 
 @app.get("/api/tmdb/tv/{tv_id}")
-def tmdb_tv_details(tv_id: int):
+def tmdb_tv_details(tv_id: int, _: bool = Depends(verify_supabase_anon_key)):
     """Get TV show details by ID."""
     if tv_id < 1:
         raise HTTPException(status_code=400, detail="Invalid TV show ID")
@@ -585,7 +585,7 @@ def tmdb_tv_details(tv_id: int):
 
 
 @app.get("/api/tmdb/movie/{movie_id}/credits")
-def tmdb_movie_credits(movie_id: int):
+def tmdb_movie_credits(movie_id: int, _: bool = Depends(verify_supabase_anon_key)):
     """Get movie credits by ID."""
     if movie_id < 1:
         raise HTTPException(status_code=400, detail="Invalid movie ID")
@@ -593,7 +593,7 @@ def tmdb_movie_credits(movie_id: int):
 
 
 @app.get("/api/tmdb/tv/{tv_id}/credits")
-def tmdb_tv_credits(tv_id: int):
+def tmdb_tv_credits(tv_id: int, _: bool = Depends(verify_supabase_anon_key)):
     """Get TV show credits by ID."""
     if tv_id < 1:
         raise HTTPException(status_code=400, detail="Invalid TV show ID")
@@ -608,8 +608,7 @@ def tmdb_discover_movies(
     primary_release_year: Optional[int] = None,
     watch_region: Optional[str] = "IN",
     sort_by: str = "popularity.desc",
-    primary_release_date_gte: Optional[str] = None
-):
+    primary_release_date_gte: Optional[str] = None, _: bool = Depends(verify_supabase_anon_key)):
     """
     Discover movies with various filters.
     All parameters are validated before passing to TMDB.
@@ -639,8 +638,7 @@ def tmdb_discover_tv(
     first_air_date_year: Optional[int] = None,
     watch_region: Optional[str] = "IN",
     sort_by: str = "popularity.desc",
-    first_air_date_gte: Optional[str] = None
-):
+    first_air_date_gte: Optional[str] = None, _: bool = Depends(verify_supabase_anon_key)):
     """
     Discover TV shows with various filters.
     All parameters are validated before passing to TMDB.
@@ -663,25 +661,25 @@ def tmdb_discover_tv(
 
 
 @app.get("/api/tmdb/genre/movie")
-def tmdb_movie_genres():
+def tmdb_movie_genres(_: bool = Depends(verify_supabase_anon_key)):
     """Get list of movie genres."""
     return _tmdb_request("/genre/movie/list")
 
 
 @app.get("/api/tmdb/genre/tv")
-def tmdb_tv_genres():
+def tmdb_tv_genres(_: bool = Depends(verify_supabase_anon_key)):
     """Get list of TV genres."""
     return _tmdb_request("/genre/tv/list")
 
 
 @app.get("/api/tmdb/watch-providers")
-def tmdb_watch_providers(watch_region: str = "IN"):
+def tmdb_watch_providers(watch_region: str = "IN", _: bool = Depends(verify_supabase_anon_key)):
     """Get available watch providers for a region."""
     return _tmdb_request("/watch/providers/movie", {"watch_region": watch_region})
 
 
 @app.get("/api/tmdb/movie/{movie_id}/watch-providers")
-def tmdb_movie_watch_providers(movie_id: int):
+def tmdb_movie_watch_providers(movie_id: int, _: bool = Depends(verify_supabase_anon_key)):
     """Get watch providers for a specific movie."""
     if movie_id < 1:
         raise HTTPException(status_code=400, detail="Invalid movie ID")
@@ -689,7 +687,7 @@ def tmdb_movie_watch_providers(movie_id: int):
 
 
 @app.get("/api/tmdb/tv/{tv_id}/watch-providers")
-def tmdb_tv_watch_providers(tv_id: int):
+def tmdb_tv_watch_providers(tv_id: int, _: bool = Depends(verify_supabase_anon_key)):
     """Get watch providers for a specific TV show."""
     if tv_id < 1:
         raise HTTPException(status_code=400, detail="Invalid TV show ID")
