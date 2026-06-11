@@ -105,6 +105,38 @@ async def verify_cron_api_key(x_api_key: Optional[str] = Header(None, alias="X-A
     return True
 
 
+# ============================================================================
+# Lightweight Supabase anon-key gate for public TMDB proxy endpoints.
+# Mirrors the pattern used by the Supabase `tmdb-proxy` edge function: callers
+# must present the project's Supabase anon/publishable key in either the
+# `apikey` or `Authorization: Bearer` header. This blocks random external
+# scripts from draining the TMDB quota while still allowing the official app.
+# ============================================================================
+SUPABASE_PUBLISHABLE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
+
+
+async def verify_supabase_anon_key(
+    apikey: Optional[str] = Header(None, alias="apikey"),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+):
+    """Reject any request that does not present the Supabase anon/publishable key."""
+    if not SUPABASE_PUBLISHABLE_KEY:
+        # Fail closed when the server is not configured rather than leaking
+        # the misconfiguration to the caller.
+        logger.error("SUPABASE_PUBLISHABLE_KEY not configured - rejecting request")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+    # Accept either header style.
+    provided = apikey
+    if not provided and authorization and authorization.lower().startswith("bearer "):
+        provided = authorization.split(" ", 1)[1]
+
+    if not provided or not hmac.compare_digest(provided, SUPABASE_PUBLISHABLE_KEY):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    return True
+
+
 # Simple access logging middleware
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
