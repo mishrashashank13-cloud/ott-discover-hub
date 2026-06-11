@@ -78,10 +78,13 @@ async def verify_cron_api_key(x_api_key: Optional[str] = Header(None, alias="X-A
     - Used by your scheduler (e.g., Vercel Cron, Railway Cron) to authenticate
     """
     if not CRON_API_KEY:
+        # Log the specific misconfiguration server-side only; respond with a
+        # generic message so callers cannot enumerate which env vars are
+        # missing on the host.
         logger.error("CRON_API_KEY not configured - rejecting request")
         raise HTTPException(
             status_code=500,
-            detail="Server misconfigured: CRON_API_KEY not set"
+            detail="Internal server error"
         )
     
     if not x_api_key:
@@ -183,10 +186,16 @@ def upcoming_shows(page: int = Query(1, ge=1), language: str = "en-US"):
     try:
         r = requests.get(discover_url, headers=headers, params=params, timeout=10)
     except requests.RequestException as e:
+        # Network-level failures often include the full upstream URL/host in
+        # str(e); keep that detail in server logs only and return a generic
+        # error to the caller.
         logger.error("TMDB request failed: %s", e)
-        raise HTTPException(status_code=502, detail=str(e))
+        raise HTTPException(status_code=502, detail="Failed to fetch upcoming shows")
     if r.status_code != 200:
-        raise HTTPException(status_code=r.status_code, detail=r.text)
+        # Avoid forwarding TMDB's raw error body (which can include internal
+        # API error codes and descriptions) to anonymous callers.
+        logger.warning("TMDB upcoming-shows non-200: %s %s", r.status_code, r.text[:200])
+        raise HTTPException(status_code=r.status_code, detail="External API error")
     return r.json()
 
 

@@ -7,4 +7,6 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.send-contact-email]
-verify_jwt = false
+# Require a valid Supabase JWT (anon key is fine for anonymous submitters)
+# so random internet bots cannot hammer this endpoint directly.
+verify_jwt = true
