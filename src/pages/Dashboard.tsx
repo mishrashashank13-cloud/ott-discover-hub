@@ -152,15 +152,15 @@ export const Dashboard = () => {
         </div>
 
         {/* Tabs for Recommendations and Reminders */}
-        <Tabs defaultValue="reminders" className="w-full">
+        <Tabs defaultValue="recommendations" className="w-full">
           <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="reminders" className="flex items-center gap-2">
-              <Bell className="h-4 w-4" />
-              Reminders
-            </TabsTrigger>
             <TabsTrigger value="recommendations" className="flex items-center gap-2">
               <Sparkles className="h-4 w-4" />
               Recommendations
+            </TabsTrigger>
+            <TabsTrigger value="reminders" className="flex items-center gap-2">
+              <Bell className="h-4 w-4" />
+              Reminders
             </TabsTrigger>
           </TabsList>
 
