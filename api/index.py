@@ -78,10 +78,13 @@ async def verify_cron_api_key(x_api_key: Optional[str] = Header(None, alias="X-A
     - Used by your scheduler (e.g., Vercel Cron, Railway Cron) to authenticate
     """
     if not CRON_API_KEY:
+        # Log the specific misconfiguration server-side only; respond with a
+        # generic message so callers cannot enumerate which env vars are
+        # missing on the host.
         logger.error("CRON_API_KEY not configured - rejecting request")
         raise HTTPException(
             status_code=500,
-            detail="Server misconfigured: CRON_API_KEY not set"
+            detail="Internal server error"
         )
     
     if not x_api_key:
@@ -102,6 +105,38 @@ async def verify_cron_api_key(x_api_key: Optional[str] = Header(None, alias="X-A
     return True
 
 
+# ============================================================================
+# Lightweight Supabase anon-key gate for public TMDB proxy endpoints.
+# Mirrors the pattern used by the Supabase `tmdb-proxy` edge function: callers
+# must present the project's Supabase anon/publishable key in either the
+# `apikey` or `Authorization: Bearer` header. This blocks random external
+# scripts from draining the TMDB quota while still allowing the official app.
+# ============================================================================
+SUPABASE_PUBLISHABLE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
+
+
+async def verify_supabase_anon_key(
+    apikey: Optional[str] = Header(None, alias="apikey"),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+):
+    """Reject any request that does not present the Supabase anon/publishable key."""
+    if not SUPABASE_PUBLISHABLE_KEY:
+        # Fail closed when the server is not configured rather than leaking
+        # the misconfiguration to the caller.
+        logger.error("SUPABASE_PUBLISHABLE_KEY not configured - rejecting request")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+    # Accept either header style.
+    provided = apikey
+    if not provided and authorization and authorization.lower().startswith("bearer "):
+        provided = authorization.split(" ", 1)[1]
+
+    if not provided or not hmac.compare_digest(provided, SUPABASE_PUBLISHABLE_KEY):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    return True
+
+
 # Simple access logging middleware
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -119,7 +154,7 @@ async def log_requests(request: Request, call_next):
 
 
 @app.get("/api/upcoming-shows")
-def upcoming_shows(page: int = Query(1, ge=1), language: str = "en-US"):
+def upcoming_shows(page: int = Query(1, ge=1), language: str = "en-US", _: bool = Depends(verify_supabase_anon_key)):
     today = date.today().isoformat()
     discover_url = f"{TMDB_BASE}/discover/tv"
     headers = {"Authorization": f"Bearer {TMDB_TOKEN}"} if TMDB_TOKEN else {}
@@ -183,10 +218,16 @@ def upcoming_shows(page: int = Query(1, ge=1), language: str = "en-US"):
     try:
         r = requests.get(discover_url, headers=headers, params=params, timeout=10)
     except requests.RequestException as e:
+        # Network-level failures often include the full upstream URL/host in
+        # str(e); keep that detail in server logs only and return a generic
+        # error to the caller.
         logger.error("TMDB request failed: %s", e)
-        raise HTTPException(status_code=502, detail=str(e))
+        raise HTTPException(status_code=502, detail="Failed to fetch upcoming shows")
     if r.status_code != 200:
-        raise HTTPException(status_code=r.status_code, detail=r.text)
+        # Avoid forwarding TMDB's raw error body (which can include internal
+        # API error codes and descriptions) to anonymous callers.
+        logger.warning("TMDB upcoming-shows non-200: %s %s", r.status_code, r.text[:200])
+        raise HTTPException(status_code=r.status_code, detail="External API error")
     return r.json()
 
 
@@ -483,43 +524,43 @@ def _tmdb_multi_page(endpoint: str, params: dict = None, max_pages: int = 5) -> 
 
 
 @app.get("/api/tmdb/trending/movie")
-def tmdb_trending_movies():
+def tmdb_trending_movies(_: bool = Depends(verify_supabase_anon_key)):
     """Get trending movies (proxied from TMDB)."""
     return _tmdb_multi_page("/trending/movie/week", {"region": "IN"})
 
 
 @app.get("/api/tmdb/trending/tv")
-def tmdb_trending_tv():
+def tmdb_trending_tv(_: bool = Depends(verify_supabase_anon_key)):
     """Get trending TV shows (proxied from TMDB)."""
     return _tmdb_multi_page("/trending/tv/week", {"region": "IN"})
 
 
 @app.get("/api/tmdb/upcoming/movie")
-def tmdb_upcoming_movies():
+def tmdb_upcoming_movies(_: bool = Depends(verify_supabase_anon_key)):
     """Get upcoming movies (proxied from TMDB)."""
     return _tmdb_multi_page("/movie/upcoming", {"region": "IN"})
 
 
 @app.get("/api/tmdb/popular/movie")
-def tmdb_popular_movies():
+def tmdb_popular_movies(_: bool = Depends(verify_supabase_anon_key)):
     """Get popular movies (proxied from TMDB)."""
     return _tmdb_multi_page("/movie/popular", {"region": "IN"})
 
 
 @app.get("/api/tmdb/popular/tv")
-def tmdb_popular_tv():
+def tmdb_popular_tv(_: bool = Depends(verify_supabase_anon_key)):
     """Get popular TV shows (proxied from TMDB)."""
     return _tmdb_multi_page("/tv/popular", {"region": "IN"})
 
 
 @app.get("/api/tmdb/trending/all")
-def tmdb_trending_all():
+def tmdb_trending_all(_: bool = Depends(verify_supabase_anon_key)):
     """Get all trending content (proxied from TMDB)."""
     return _tmdb_request("/trending/all/week", {"region": "IN"})
 
 
 @app.get("/api/tmdb/search")
-def tmdb_search(query: str = Query(..., min_length=1, max_length=200)):
+def tmdb_search(query: str = Query(..., min_length=1, max_length=200, _: bool = Depends(verify_supabase_anon_key))):
     """
     Search for movies and TV shows.
     Query parameter is validated for length to prevent abuse.
@@ -528,7 +569,7 @@ def tmdb_search(query: str = Query(..., min_length=1, max_length=200)):
 
 
 @app.get("/api/tmdb/movie/{movie_id}")
-def tmdb_movie_details(movie_id: int):
+def tmdb_movie_details(movie_id: int, _: bool = Depends(verify_supabase_anon_key)):
     """Get movie details by ID."""
     if movie_id < 1:
         raise HTTPException(status_code=400, detail="Invalid movie ID")
@@ -536,7 +577,7 @@ def tmdb_movie_details(movie_id: int):
 
 
 @app.get("/api/tmdb/tv/{tv_id}")
-def tmdb_tv_details(tv_id: int):
+def tmdb_tv_details(tv_id: int, _: bool = Depends(verify_supabase_anon_key)):
     """Get TV show details by ID."""
     if tv_id < 1:
         raise HTTPException(status_code=400, detail="Invalid TV show ID")
@@ -544,7 +585,7 @@ def tmdb_tv_details(tv_id: int):
 
 
 @app.get("/api/tmdb/movie/{movie_id}/credits")
-def tmdb_movie_credits(movie_id: int):
+def tmdb_movie_credits(movie_id: int, _: bool = Depends(verify_supabase_anon_key)):
     """Get movie credits by ID."""
     if movie_id < 1:
         raise HTTPException(status_code=400, detail="Invalid movie ID")
@@ -552,7 +593,7 @@ def tmdb_movie_credits(movie_id: int):
 
 
 @app.get("/api/tmdb/tv/{tv_id}/credits")
-def tmdb_tv_credits(tv_id: int):
+def tmdb_tv_credits(tv_id: int, _: bool = Depends(verify_supabase_anon_key)):
     """Get TV show credits by ID."""
     if tv_id < 1:
         raise HTTPException(status_code=400, detail="Invalid TV show ID")
@@ -567,8 +608,7 @@ def tmdb_discover_movies(
     primary_release_year: Optional[int] = None,
     watch_region: Optional[str] = "IN",
     sort_by: str = "popularity.desc",
-    primary_release_date_gte: Optional[str] = None
-):
+    primary_release_date_gte: Optional[str] = None, _: bool = Depends(verify_supabase_anon_key)):
     """
     Discover movies with various filters.
     All parameters are validated before passing to TMDB.
@@ -598,8 +638,7 @@ def tmdb_discover_tv(
     first_air_date_year: Optional[int] = None,
     watch_region: Optional[str] = "IN",
     sort_by: str = "popularity.desc",
-    first_air_date_gte: Optional[str] = None
-):
+    first_air_date_gte: Optional[str] = None, _: bool = Depends(verify_supabase_anon_key)):
     """
     Discover TV shows with various filters.
     All parameters are validated before passing to TMDB.
@@ -622,25 +661,25 @@ def tmdb_discover_tv(
 
 
 @app.get("/api/tmdb/genre/movie")
-def tmdb_movie_genres():
+def tmdb_movie_genres(_: bool = Depends(verify_supabase_anon_key)):
     """Get list of movie genres."""
     return _tmdb_request("/genre/movie/list")
 
 
 @app.get("/api/tmdb/genre/tv")
-def tmdb_tv_genres():
+def tmdb_tv_genres(_: bool = Depends(verify_supabase_anon_key)):
     """Get list of TV genres."""
     return _tmdb_request("/genre/tv/list")
 
 
 @app.get("/api/tmdb/watch-providers")
-def tmdb_watch_providers(watch_region: str = "IN"):
+def tmdb_watch_providers(watch_region: str = "IN", _: bool = Depends(verify_supabase_anon_key)):
     """Get available watch providers for a region."""
     return _tmdb_request("/watch/providers/movie", {"watch_region": watch_region})
 
 
 @app.get("/api/tmdb/movie/{movie_id}/watch-providers")
-def tmdb_movie_watch_providers(movie_id: int):
+def tmdb_movie_watch_providers(movie_id: int, _: bool = Depends(verify_supabase_anon_key)):
     """Get watch providers for a specific movie."""
     if movie_id < 1:
         raise HTTPException(status_code=400, detail="Invalid movie ID")
@@ -648,7 +687,7 @@ def tmdb_movie_watch_providers(movie_id: int):
 
 
 @app.get("/api/tmdb/tv/{tv_id}/watch-providers")
-def tmdb_tv_watch_providers(tv_id: int):
+def tmdb_tv_watch_providers(tv_id: int, _: bool = Depends(verify_supabase_anon_key)):
     """Get watch providers for a specific TV show."""
     if tv_id < 1:
         raise HTTPException(status_code=400, detail="Invalid TV show ID")

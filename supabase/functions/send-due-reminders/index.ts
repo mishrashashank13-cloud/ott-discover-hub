@@ -256,7 +256,15 @@ serve(async (req) => {
       ((envSecret && secureCompare(requestKey, envSecret)) ||
         (dbSecret && secureCompare(requestKey, dbSecret)));
 
-    if ((envSecret || dbSecret) && !validKey) {
+    // ALWAYS require a valid function key. If neither secret is configured
+    // (envSecret and dbSecret both empty), reject every request — failing
+    // closed prevents an auth-bypass window during initial setup.
+    if (!validKey) {
+      if (!envSecret && !dbSecret) {
+        console.error(
+          "send-due-reminders: no REMINDER_FUNCTION_SECRET or internal_secrets row configured — rejecting request."
+        );
+      }
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
