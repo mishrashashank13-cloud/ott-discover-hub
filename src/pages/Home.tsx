@@ -371,6 +371,49 @@ export const Home = () => {
           </p>
         </header>
 
+        {/* "Top Picks for You" — surfaces recently viewed titles from the
+            user's browsing history so they can quickly revisit content.
+            Visible only when the user is logged in and has viewing history. */}
+        {userId && browsingHistory.length > 0 && (
+          <section className="mb-12">
+            <SectionHeader
+              icon={History}
+              title="Top Picks for You"
+              onViewMore={() => navigate('/dashboard')}
+            />
+            <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-3">
+              {browsingHistory
+                .filter((item, index, self) =>
+                  index === self.findIndex((t) => t.content_id === item.content_id)
+                )
+                .map((item) => (
+                  <div
+                    key={item.id}
+                    className="cursor-pointer group"
+                    onClick={() => navigate(`/${item.content_type}/${item.content_id}`)}
+                  >
+                    <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-muted">
+                      <img
+                        src={getImageUrl(item.poster_path, 'w500')}
+                        alt={item.content_title ? `${item.content_title} poster` : 'Content poster'}
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                        loading="lazy"
+                      />
+                      <div className="absolute top-1.5 left-1.5">
+                        <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+                          {item.content_type === 'movie' ? 'Movie' : 'TV Show'}
+                        </Badge>
+                      </div>
+                    </div>
+                    <p className="text-xs font-medium mt-1.5 line-clamp-1 text-foreground">
+                      {item.content_title}
+                    </p>
+                  </div>
+                ))}
+            </div>
+          </section>
+        )}
+
         {/* "Recommended for You" — personalized blended ribbon (logged-in only).
             Mixes movies + TV shows derived from the user's liked content,
             browsing history exclusions, and ranked language/genre profile
