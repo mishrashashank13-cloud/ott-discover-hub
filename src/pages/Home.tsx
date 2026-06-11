@@ -48,6 +48,8 @@ export const Home = () => {
   // surface always feels fresh.
   const [excludedMovieIds, setExcludedMovieIds] = useState<Set<number>>(new Set());
   const [excludedTvIds, setExcludedTvIds] = useState<Set<number>>(new Set());
+  // Browsing history items used to build the "Top Picks for You" ribbon.
+  const [browsingHistory, setBrowsingHistory] = useState<Tables<'browsing_history'>[]>([]);
   
   // Fetch user data and preferences on component mount
   useEffect(() => {
