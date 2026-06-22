@@ -355,7 +355,7 @@ export const Home = () => {
     <div className="min-h-screen bg-background">
       {/* Per-route SEO tags — unique title/description/canonical for the homepage. */}
       <SEO
-        title="BingeGuide: Your OTT Content Tracker and Reminder"
+        title="BingeGuide: Your OTT Content Tracker and Reminder System"
         description="Discover, track, and get release reminders for movies and TV shows across Netflix, Prime Video, Hotstar, JioCinema and other OTT platforms."
         path="/"
       />
@@ -364,7 +364,7 @@ export const Home = () => {
         {/* Page H1 — describes the whole page and appears first in reading order. */}
         <header className="mb-10">
           <h1 className="text-3xl md:text-4xl font-bold text-foreground">
-            BingeGuide: Your OTT Content Tracker and Reminder
+            BingeGuide: Your OTT Content Tracker and Reminder System
           </h1>
           <p className="mt-2 text-muted-foreground">
             Browse trending, upcoming, and recommended OTT releases — all in one place.
