@@ -4,7 +4,8 @@ import { MovieCard } from "@/components/MovieCard";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, TrendingUp, Film, Tv, Calendar, ArrowRight, Star, Heart, Info, HelpCircle, Mail, History } from "lucide-react";
+import { AlertCircle, TrendingUp, Film, Tv, Calendar, ArrowRight, Star, Heart, Info, HelpCircle, Mail, History, Smartphone } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useNavigate, Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
@@ -369,6 +370,16 @@ export const Home = () => {
           <p className="mt-2 text-muted-foreground">
             Browse trending, upcoming, and recommended OTT releases — all in one place.
           </p>
+          {/* Prominent "Download Android App" CTA — takes users to the
+              dedicated /download page. Rendered on every homepage visit. */}
+          <div className="mt-4">
+            <Button asChild size="lg" className="w-full sm:w-auto">
+              <Link to="/download" aria-label="Download BingeGuide Android app" className="flex items-center gap-2">
+                <Smartphone className="h-5 w-5" />
+                Download Android App
+              </Link>
+            </Button>
+          </div>
         </header>
 
         {/* "Top Picks for You" — surfaces recently viewed titles from the
