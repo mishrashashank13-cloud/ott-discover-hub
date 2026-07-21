@@ -17,6 +17,8 @@ import { AboutUs } from "./pages/AboutUs";
 import { HowToUse } from "./pages/HowToUse";
 import { ContactUs } from "./pages/ContactUs";
 import { ResetPassword } from "./pages/ResetPassword";
+import { Download } from "./pages/Download";
+import { Footer } from "./components/Footer";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -43,9 +45,11 @@ const App = () => (
             <Route path="/about" element={<AboutUs />} />
             <Route path="/how-to-use" element={<HowToUse />} />
             <Route path="/contact" element={<ContactUs />} />
+            <Route path="/download" element={<Download />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
+        <Footer />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
