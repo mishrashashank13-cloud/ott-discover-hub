@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Film, Smartphone, Download, ShieldCheck, CheckCircle2, Calendar, HardDrive, Tag } from "lucide-react";
+import { Film, Smartphone, Download as DownloadIcon, ShieldCheck, CheckCircle2, Calendar, HardDrive, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -86,7 +86,7 @@ export const Download = () => {
                     aria-label={`Download ${app.appName} APK version ${app.version}`}
                     className="flex items-center gap-2"
                   >
-                    <Download className="h-5 w-5" />
+                    <DownloadIcon className="h-5 w-5" />
                     Download APK ({app.fileSize})
                   </a>
                 </Button>
