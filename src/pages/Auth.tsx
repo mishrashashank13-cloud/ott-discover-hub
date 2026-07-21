@@ -163,11 +163,13 @@ export const Auth = () => {
         description: "You have successfully signed in",
       });
     } catch (error: any) {
-      // Handle specific error cases with user-friendly messages
-      if (error.message.includes('Invalid login credentials')) {
+      // Handle specific error cases with user-friendly messages.
+      // For any other case, return a generic message so we don't leak
+      // Supabase-internal detail (rate-limit state, account existence, etc.).
+      if (error?.message?.includes('Invalid login credentials')) {
         setError('Invalid email or password. Please try again.');
       } else {
-        setError(error.message ?? 'Sign in failed');
+        setError('Something went wrong. Please try again later.');
       }
     } finally {
       setIsLoading(false);
@@ -211,11 +213,12 @@ export const Auth = () => {
         description: "Please check your email to verify your account",
       });
     } catch (error: any) {
-      // Handle specific error cases with user-friendly messages
-      if (error.message.includes('already registered')) {
+      // Handle specific error cases with user-friendly messages.
+      // Fallback avoids leaking raw Supabase SDK detail to end users.
+      if (error?.message?.includes('already registered')) {
         setError('This email is already registered. Please sign in instead.');
       } else {
-        setError(error.message ?? 'Sign up failed');
+        setError('Something went wrong. Please try again later.');
       }
     } finally {
       setIsLoading(false);
@@ -240,7 +243,8 @@ export const Auth = () => {
 
       if (error) throw error;
     } catch (error: any) {
-      setError(error.message);
+      // Do not surface raw SDK error text to the UI.
+      setError('Something went wrong. Please try again later.');
       setIsLoading(false);
     }
   };
@@ -275,7 +279,8 @@ export const Auth = () => {
       setShowForgotPassword(false);
       setEmail('');
     } catch (error: any) {
-      setError(error.message ?? 'Failed to send reset email');
+      // Return a generic message to avoid leaking internal SDK detail.
+      setError('Something went wrong. Please try again later.');
     } finally {
       setIsLoading(false);
     }
