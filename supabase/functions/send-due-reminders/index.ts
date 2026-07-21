@@ -45,6 +45,30 @@ function base64Encode(str: string): string {
   return btoa(String.fromCharCode(...data));
 }
 
+// Strip CR/LF (and other control chars) to prevent SMTP header injection.
+// User-controlled values that end up on a `Subject:` (or any header) line
+// must never contain a newline — otherwise an attacker can append arbitrary
+// headers such as `Bcc:` and turn the mailer into a spam relay.
+function sanitizeHeaderValue(value: string): string {
+  return (value ?? "")
+    .replace(/[\r\n]+/g, " ")
+    // Drop remaining ASCII control characters (0x00-0x1F, 0x7F)
+    .replace(/[\x00-\x1F\x7F]/g, "")
+    .slice(0, 200)
+    .trim();
+}
+
+// Escape HTML special characters before interpolating user-controlled text
+// into an HTML email body. Prevents HTML/script injection in email clients.
+function escapeHtml(value: string): string {
+  return (value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function secureCompare(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let result = 0;
@@ -323,10 +347,16 @@ serve(async (req) => {
     // affect that one row.
     for (const r of reminders as Reminder[]) {
       const profile = profileMap.get(r.user_id);
-      const subject = `Reminder: ${r.content_title}`;
+
+      // Sanitize user-controlled fields before use in SMTP headers / HTML body.
+      const safeTitleHeader = sanitizeHeaderValue(r.content_title ?? "");
+      const safeTitleHtml = escapeHtml(r.content_title ?? "");
+      const safeTypeHtml = escapeHtml(r.content_type ?? "");
+
+      const subject = `Reminder: ${safeTitleHeader}`;
       const html = `
         <h2>Your BingeGuide reminder</h2>
-        <p><strong>${r.content_title}</strong> (${r.content_type}) is ready for you.</p>
+        <p><strong>${safeTitleHtml}</strong> (${safeTypeHtml}) is ready for you.</p>
         <p>Open BingeGuide to start watching.</p>
       `;
 
