@@ -48,6 +48,19 @@ if not TMDB_TOKEN and not TMDB_API_KEY:
 
 TMDB_BASE = "https://api.themoviedb.org/3"
 
+
+def _sanitize_header(value: str) -> str:
+    """
+    Strip CR/LF and other control characters from a value before it is used
+    in an email header (Subject, To, etc.). Prevents SMTP header injection
+    where a user-controlled field could smuggle extra headers like Bcc.
+    """
+    if value is None:
+        return ""
+    # Remove CR/LF and all ASCII control chars, cap length defensively.
+    cleaned = "".join(ch for ch in str(value) if ch not in ("\r", "\n") and (ord(ch) >= 32 or ch == "\t") and ord(ch) != 0x7F)
+    return cleaned.strip()[:200]
+
 app = FastAPI()
 
 # ALLOWED_ORIGINS can be a comma-separated list of allowed origins
@@ -316,9 +329,10 @@ def cron_daily_reminders(authenticated: bool = Depends(verify_cron_api_key)):
         email = profile.get("email")
         phone = profile.get("mobile_number")
         release_date_str = rem.get("release_date")
-        title = rem.get("content_title") or rem.get("content_id")
+        title = _sanitize_header(rem.get("content_title") or rem.get("content_id") or "")
+        safe_release = _sanitize_header(release_date_str or "")
         message = {
-            "subject": f"Reminder: {title} releasing on {release_date_str}",
+            "subject": f"Reminder: {title} releasing on {safe_release}",
             "bodyText": f"Hi! Your reminder for '{title}'. Release date: {release_date_str}. We'll keep you posted.",
         }
         try:
@@ -445,10 +459,11 @@ def send_due_reminders(authenticated: bool = Depends(verify_cron_api_key)):
         profile = rem.get("profiles", {})
         email = profile.get("email")
         phone = profile.get("mobile_number")
-        title = rem.get("content_title") or rem.get("content_id")
+        title = _sanitize_header(rem.get("content_title") or rem.get("content_id") or "")
         release_date = rem.get("release_date")
+        safe_release = _sanitize_header(release_date or "")
         message = {
-            "subject": f"Reminder: {title} releasing on {release_date}",
+            "subject": f"Reminder: {title} releasing on {safe_release}",
             "bodyText": f"Your reminder for '{title}' is due. Release date: {release_date}.",
         }
         try:

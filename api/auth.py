@@ -9,7 +9,8 @@ import string
 import time
 import hashlib
 import secrets
-from typing import Dict, Tuple
+from collections import OrderedDict
+from typing import Dict
 
 router = APIRouter()
 
@@ -21,21 +22,30 @@ OTP_MAX_ATTEMPTS = 5  # Maximum verification attempts before lockout
 OTP_RATE_LIMIT_SECONDS = 60  # Minimum time between OTP generation requests
 OTP_LENGTH = 6  # Length of OTP code
 
+# Hard caps to prevent unbounded memory growth from anonymous callers.
+# The identifier length cap blocks attackers from stuffing megabytes of data
+# per request, and the store cap enforces LRU eviction so total memory used
+# by the OTP subsystem is bounded regardless of request volume.
+MAX_IDENTIFIER_LENGTH = 254  # Enough for a valid email (RFC 5321)
+MAX_OTP_STORE_ENTRIES = 10_000
+MAX_RATE_LIMIT_ENTRIES = 10_000
+
 
 # ============================================================================
-# Secure In-Memory OTP Store
-# Format: {identifier: {"otp_hash": str, "created_at": float, "attempts": int}}
-# 
-# IMPORTANT: This in-memory storage is suitable for development/testing only.
-# For production deployments, consider:
-# - Redis with TTL for automatic expiration and horizontal scaling
-# - Database storage with scheduled cleanup jobs
-# - This implementation will lose all OTPs on server restart
+# Secure In-Memory OTP Store (bounded, LRU-evicted)
 # ============================================================================
-otp_store: Dict[str, Dict] = {}
+# OrderedDict lets us evict the oldest entry in O(1) when we hit the cap,
+# which prevents an attacker from exhausting server memory by sending many
+# requests with unique identifiers.
+otp_store: "OrderedDict[str, Dict]" = OrderedDict()
+rate_limit_store: "OrderedDict[str, float]" = OrderedDict()
 
-# Rate limiting store: {identifier: last_request_timestamp}
-rate_limit_store: Dict[str, float] = {}
+
+def _enforce_store_cap(store: OrderedDict, max_entries: int) -> None:
+    """Evict oldest entries until the store is within its size cap."""
+    while len(store) > max_entries:
+        store.popitem(last=False)
+
 
 
 def _generate_otp(length: int = OTP_LENGTH) -> str:
@@ -89,41 +99,59 @@ def signup(identifier: str = Body(..., embed=True)):
     """
     Signup using email or phone.
     Generates and stores a hashed OTP with expiration.
-    
+
     Security features:
+    - Identifier length is validated to block memory-exhaustion attacks
     - Rate limiting prevents abuse
+    - OTP store is capped and LRU-evicted to bound memory usage
     - OTPs are hashed before storage
     - OTPs expire after 5 minutes
     - OTP value is NOT returned in response (must be sent via email/SMS)
     """
+    # Reject oversized or empty identifiers up front. This prevents an anonymous
+    # caller from stuffing arbitrarily large strings into the in-memory store.
+    if not isinstance(identifier, str) or not identifier.strip():
+        raise HTTPException(status_code=400, detail="Invalid identifier")
+    if len(identifier) > MAX_IDENTIFIER_LENGTH:
+        raise HTTPException(status_code=400, detail="Identifier too long")
+
     # Clean up expired OTPs periodically
     _cleanup_expired_otps()
-    
+
     # Check rate limiting to prevent abuse
     if _is_rate_limited(identifier):
         raise HTTPException(
             status_code=429,
             detail="Too many requests. Please wait before requesting another OTP."
         )
-    
+
     # Generate secure OTP
     otp = _generate_otp()
-    
-    # Store hashed OTP with metadata (NEVER store plain OTP)
+
+    # Store hashed OTP with metadata (NEVER store plain OTP). Using move_to_end
+    # keeps the OrderedDict ordered by most-recent write so LRU eviction below
+    # drops the oldest inactive entries first.
     otp_store[identifier] = {
         "otp_hash": _hash_otp(otp),
         "created_at": time.time(),
         "attempts": 0
     }
-    
+    otp_store.move_to_end(identifier)
+
     # Update rate limit tracking
     rate_limit_store[identifier] = time.time()
-    
+    rate_limit_store.move_to_end(identifier)
+
+    # Enforce hard caps so anonymous traffic cannot grow memory without bound.
+    _enforce_store_cap(otp_store, MAX_OTP_STORE_ENTRIES)
+    _enforce_store_cap(rate_limit_store, MAX_RATE_LIMIT_ENTRIES)
+
     # TODO: In production, send OTP via email/SMS here
     # send_otp_via_email(identifier, otp) or send_otp_via_sms(identifier, otp)
-    
+
     # SECURITY: Do NOT return OTP in response - it must be sent via secure channel
-    return {"message": f"OTP sent to {identifier}"}
+    return {"message": "OTP sent"}
+
 
 
 @router.post("/verify")
@@ -137,7 +165,12 @@ def verify(identifier: str = Body(..., embed=True), otp: str = Body(..., embed=T
     - Secure hash comparison
     - Cleanup after successful verification
     """
+    # Bound the identifier size to keep verify cheap and consistent with signup.
+    if not isinstance(identifier, str) or len(identifier) > MAX_IDENTIFIER_LENGTH:
+        raise HTTPException(status_code=400, detail="Invalid identifier")
+
     stored = otp_store.get(identifier)
+
     
     # Check if OTP exists for this identifier
     # Note: If OTP is not found, it may have expired, been used, or the server
