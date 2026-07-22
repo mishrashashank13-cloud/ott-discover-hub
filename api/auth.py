@@ -165,7 +165,12 @@ def verify(identifier: str = Body(..., embed=True), otp: str = Body(..., embed=T
     - Secure hash comparison
     - Cleanup after successful verification
     """
+    # Bound the identifier size to keep verify cheap and consistent with signup.
+    if not isinstance(identifier, str) or len(identifier) > MAX_IDENTIFIER_LENGTH:
+        raise HTTPException(status_code=400, detail="Invalid identifier")
+
     stored = otp_store.get(identifier)
+
     
     # Check if OTP exists for this identifier
     # Note: If OTP is not found, it may have expired, been used, or the server
