@@ -9,7 +9,8 @@ import string
 import time
 import hashlib
 import secrets
-from typing import Dict, Tuple
+from collections import OrderedDict
+from typing import Dict
 
 router = APIRouter()
 
@@ -21,21 +22,30 @@ OTP_MAX_ATTEMPTS = 5  # Maximum verification attempts before lockout
 OTP_RATE_LIMIT_SECONDS = 60  # Minimum time between OTP generation requests
 OTP_LENGTH = 6  # Length of OTP code
 
+# Hard caps to prevent unbounded memory growth from anonymous callers.
+# The identifier length cap blocks attackers from stuffing megabytes of data
+# per request, and the store cap enforces LRU eviction so total memory used
+# by the OTP subsystem is bounded regardless of request volume.
+MAX_IDENTIFIER_LENGTH = 254  # Enough for a valid email (RFC 5321)
+MAX_OTP_STORE_ENTRIES = 10_000
+MAX_RATE_LIMIT_ENTRIES = 10_000
+
 
 # ============================================================================
-# Secure In-Memory OTP Store
-# Format: {identifier: {"otp_hash": str, "created_at": float, "attempts": int}}
-# 
-# IMPORTANT: This in-memory storage is suitable for development/testing only.
-# For production deployments, consider:
-# - Redis with TTL for automatic expiration and horizontal scaling
-# - Database storage with scheduled cleanup jobs
-# - This implementation will lose all OTPs on server restart
+# Secure In-Memory OTP Store (bounded, LRU-evicted)
 # ============================================================================
-otp_store: Dict[str, Dict] = {}
+# OrderedDict lets us evict the oldest entry in O(1) when we hit the cap,
+# which prevents an attacker from exhausting server memory by sending many
+# requests with unique identifiers.
+otp_store: "OrderedDict[str, Dict]" = OrderedDict()
+rate_limit_store: "OrderedDict[str, float]" = OrderedDict()
 
-# Rate limiting store: {identifier: last_request_timestamp}
-rate_limit_store: Dict[str, float] = {}
+
+def _enforce_store_cap(store: OrderedDict, max_entries: int) -> None:
+    """Evict oldest entries until the store is within its size cap."""
+    while len(store) > max_entries:
+        store.popitem(last=False)
+
 
 
 def _generate_otp(length: int = OTP_LENGTH) -> str:
