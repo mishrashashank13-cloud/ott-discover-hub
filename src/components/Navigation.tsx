@@ -1,9 +1,8 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { SearchBarCompact } from "@/components/SearchBarCompact";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { Home, Search, Film, Globe, User, LogOut, LayoutDashboard, Settings, History, Heart, Trash2 } from "lucide-react";
+import { Home, Search, Film, User, LogOut, LayoutDashboard, History, Heart, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { logger } from "@/lib/logger";
