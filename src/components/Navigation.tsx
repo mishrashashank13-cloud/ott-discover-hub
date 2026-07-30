@@ -1,9 +1,8 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { SearchBarCompact } from "@/components/SearchBarCompact";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { Home, Search, Film, Globe, User, LogOut, LayoutDashboard, Settings, History, Heart, Trash2 } from "lucide-react";
+import { Home, Search, Film, User, LogOut, LayoutDashboard, History, Heart, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { logger } from "@/lib/logger";
@@ -207,6 +206,36 @@ export const Navigation = () => {
                   <span className="hidden sm:inline">Search</span>
                 </Link>
               </Button>
+
+              <Button
+                variant={isActive("/about") ? "default" : "ghost"}
+                size="sm"
+                asChild
+              >
+                <Link to="/about" aria-label="About Us" className="flex items-center gap-2">
+                  <span className="hidden sm:inline">About Us</span>
+                </Link>
+              </Button>
+
+              <Button
+                variant={isActive("/how-to-use") ? "default" : "ghost"}
+                size="sm"
+                asChild
+              >
+                <Link to="/how-to-use" aria-label="How to Use" className="flex items-center gap-2">
+                  <span className="hidden sm:inline">How to Use</span>
+                </Link>
+              </Button>
+
+              <Button
+                variant={isActive("/contact") ? "default" : "ghost"}
+                size="sm"
+                asChild
+              >
+                <Link to="/contact" aria-label="Contact Us" className="flex items-center gap-2">
+                  <span className="hidden sm:inline">Contact Us</span>
+                </Link>
+              </Button>
             </div>
 
             {/* Search Bar */}
@@ -283,21 +312,6 @@ export const Navigation = () => {
               ) : null}
             </div>
 
-            {/* Language Selector */}
-            <div className="flex items-center gap-2">
-              <Globe className="h-4 w-4 text-muted-foreground" />
-              <Select defaultValue="en">
-                <SelectTrigger className="w-20 border-0 bg-transparent focus:ring-0">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="en">EN</SelectItem>
-                  <SelectItem value="es">ES</SelectItem>
-                  <SelectItem value="fr">FR</SelectItem>
-                  <SelectItem value="de">DE</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
         </div>
       </div>
