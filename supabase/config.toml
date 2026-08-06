@@ -10,3 +10,8 @@ verify_jwt = false
 # Require a valid Supabase JWT (anon key is fine for anonymous submitters)
 # so random internet bots cannot hammer this endpoint directly.
 verify_jwt = true
+
+[functions.streaming-availability]
+# Require a valid Supabase JWT (anon key is fine for guests browsing titles)
+# so the Watchmode quota cannot be drained by random external callers.
+verify_jwt = true

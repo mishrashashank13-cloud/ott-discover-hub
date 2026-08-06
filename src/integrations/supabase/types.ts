@@ -176,6 +176,48 @@ export type Database = {
         }
         Relationships: []
       }
+      streaming_availability_cache: {
+        Row: {
+          content_type: string
+          created_at: string
+          data: Json
+          expires_at: string
+          external_id: string | null
+          id: string
+          imdb_id: string | null
+          region: string
+          source: string
+          tmdb_id: string
+          updated_at: string
+        }
+        Insert: {
+          content_type: string
+          created_at?: string
+          data?: Json
+          expires_at?: string
+          external_id?: string | null
+          id?: string
+          imdb_id?: string | null
+          region?: string
+          source?: string
+          tmdb_id: string
+          updated_at?: string
+        }
+        Update: {
+          content_type?: string
+          created_at?: string
+          data?: Json
+          expires_at?: string
+          external_id?: string | null
+          id?: string
+          imdb_id?: string | null
+          region?: string
+          source?: string
+          tmdb_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       taste_classics: {
         Row: {
           description: string | null
