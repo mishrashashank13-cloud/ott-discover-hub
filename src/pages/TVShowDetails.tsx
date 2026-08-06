@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { logger } from "@/lib/logger";
 import { SEO } from "@/components/SEO";
+import { AvailableOn } from "@/components/AvailableOn";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { 
@@ -348,6 +349,14 @@ export const TVShowDetails = () => {
                 )}
               </div>
             )}
+
+            {/* Available On - streaming/rent/buy options enriched via Watchmode */}
+            <AvailableOn
+              contentType="tv"
+              tmdbId={show.id}
+              title={show.name}
+              year={show.first_air_date?.slice(0, 4)}
+            />
 
             {/* Like/Dislike and Remind Me Buttons */}
             <div className="space-y-4">
