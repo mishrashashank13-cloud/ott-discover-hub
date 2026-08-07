@@ -335,6 +335,16 @@ export const Home = () => {
     return sortByUserPreferences(fresh, userPreferences);
   }, [recommendedTVShows, userPreferences, reactedKeys]);
 
+  // "Top Picks for You": recently viewed titles, de-duplicated and with any
+  // title the user already liked/disliked removed (feedback already given).
+  const topPicks = useMemo(() => {
+    return browsingHistory
+      .filter((item, index, self) =>
+        index === self.findIndex((t) => t.content_id === item.content_id)
+      )
+      .filter((item) => !reactedKeys.has(reactedKey(item.content_type, item.content_id)));
+  }, [browsingHistory, reactedKeys]);
+
 
   const LoadingCarousel = () => (
     <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-3">
