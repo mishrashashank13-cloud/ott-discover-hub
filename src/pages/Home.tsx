@@ -316,17 +316,25 @@ export const Home = () => {
     return sortByUserPreferences(trendingTVShows.results, userPreferences);
   }, [trendingTVShows, userPreferences]);
 
-  // Sort recommended movies by user preferences
+  // Sort recommended movies by user preferences.
+  // Titles the user already liked/disliked are removed — feedback given.
   const sortedRecommendedMovies = useMemo(() => {
     if (!recommendedMovies?.results) return [];
-    return sortByUserPreferences(recommendedMovies.results, userPreferences);
-  }, [recommendedMovies, userPreferences]);
+    const fresh = recommendedMovies.results.filter(
+      (m) => !reactedKeys.has(reactedKey('movie', m.id))
+    );
+    return sortByUserPreferences(fresh, userPreferences);
+  }, [recommendedMovies, userPreferences, reactedKeys]);
 
-  // Sort recommended TV shows by user preferences
+  // Sort recommended TV shows by user preferences (same feedback filter).
   const sortedRecommendedTVShows = useMemo(() => {
     if (!recommendedTVShows?.results) return [];
-    return sortByUserPreferences(recommendedTVShows.results, userPreferences);
-  }, [recommendedTVShows, userPreferences]);
+    const fresh = recommendedTVShows.results.filter(
+      (t) => !reactedKeys.has(reactedKey('tv', t.id))
+    );
+    return sortByUserPreferences(fresh, userPreferences);
+  }, [recommendedTVShows, userPreferences, reactedKeys]);
+
 
   const LoadingCarousel = () => (
     <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-3">
