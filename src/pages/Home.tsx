@@ -14,6 +14,7 @@ import { sortByUserPreferences, sortByUserPreferencesStrong, UserPreferences } f
 import { logger } from "@/lib/logger";
 import { Sparkles } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
+import { fetchReactedContentKeys, reactedKey } from "@/lib/reactedContent";
 
 /**
  * Map of language NAMES (as stored in profile preferences) to TMDB ISO 639-1
@@ -49,6 +50,10 @@ export const Home = () => {
   // surface always feels fresh.
   const [excludedMovieIds, setExcludedMovieIds] = useState<Set<number>>(new Set());
   const [excludedTvIds, setExcludedTvIds] = useState<Set<number>>(new Set());
+  // "type:id" keys of every title the user has liked or disliked. These are
+  // hidden from ALL recommendation ribbons (feedback already given), but stay
+  // visible in Search, Reminders and the Preferences page.
+  const [reactedKeys, setReactedKeys] = useState<Set<string>>(new Set());
   // Browsing history items used to build the "Top Picks for You" ribbon.
   const [browsingHistory, setBrowsingHistory] = useState<Tables<'browsing_history'>[]>([]);
   
@@ -72,7 +77,10 @@ export const Home = () => {
             genre_preferences: (profile.genre_preferences as any) || [],
           });
         }
-        
+
+        // Load every liked/disliked title so recommendations can skip them.
+        setReactedKeys(await fetchReactedContentKeys(user.id));
+
         // Fetch user preferences and extract genre IDs for recommendations
         const { data: preferences } = await supabase
           .from('user_preferences')
@@ -86,12 +94,17 @@ export const Home = () => {
           const excludedMovies = new Set<number>();
           const excludedTv = new Set<number>();
 
-          // Fetch details for each preferred content to get genre IDs
-          for (const pref of preferences.slice(0, 5)) { // Limit to first 5 to avoid too many API calls
+          // Every reacted title is excluded from recommendations…
+          preferences.forEach((pref) => {
             const numericId = Number(pref.content_id);
             if (pref.content_type === 'movie') excludedMovies.add(numericId);
             else if (pref.content_type === 'tv') excludedTv.add(numericId);
+          });
 
+          // …but only the first few are looked up on TMDB for genre signals,
+          // to keep the number of API calls small.
+          for (const pref of preferences.slice(0, 5)) {
+            const numericId = Number(pref.content_id);
             try {
               if (pref.content_type === 'movie') {
                 const details = await tmdbApi.getMovieDetails(numericId);
@@ -123,6 +136,7 @@ export const Home = () => {
           setExcludedMovieIds(excludedMovies);
           setExcludedTvIds(excludedTv);
         }
+
 
         // Pull the user's recent browsing history to populate the
         // "Top Picks for You" ribbon on the home page.
@@ -302,17 +316,35 @@ export const Home = () => {
     return sortByUserPreferences(trendingTVShows.results, userPreferences);
   }, [trendingTVShows, userPreferences]);
 
-  // Sort recommended movies by user preferences
+  // Sort recommended movies by user preferences.
+  // Titles the user already liked/disliked are removed — feedback given.
   const sortedRecommendedMovies = useMemo(() => {
     if (!recommendedMovies?.results) return [];
-    return sortByUserPreferences(recommendedMovies.results, userPreferences);
-  }, [recommendedMovies, userPreferences]);
+    const fresh = recommendedMovies.results.filter(
+      (m) => !reactedKeys.has(reactedKey('movie', m.id))
+    );
+    return sortByUserPreferences(fresh, userPreferences);
+  }, [recommendedMovies, userPreferences, reactedKeys]);
 
-  // Sort recommended TV shows by user preferences
+  // Sort recommended TV shows by user preferences (same feedback filter).
   const sortedRecommendedTVShows = useMemo(() => {
     if (!recommendedTVShows?.results) return [];
-    return sortByUserPreferences(recommendedTVShows.results, userPreferences);
-  }, [recommendedTVShows, userPreferences]);
+    const fresh = recommendedTVShows.results.filter(
+      (t) => !reactedKeys.has(reactedKey('tv', t.id))
+    );
+    return sortByUserPreferences(fresh, userPreferences);
+  }, [recommendedTVShows, userPreferences, reactedKeys]);
+
+  // "Top Picks for You": recently viewed titles, de-duplicated and with any
+  // title the user already liked/disliked removed (feedback already given).
+  const topPicks = useMemo(() => {
+    return browsingHistory
+      .filter((item, index, self) =>
+        index === self.findIndex((t) => t.content_id === item.content_id)
+      )
+      .filter((item) => !reactedKeys.has(reactedKey(item.content_type, item.content_id)));
+  }, [browsingHistory, reactedKeys]);
+
 
   const LoadingCarousel = () => (
     <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-3">
@@ -385,7 +417,7 @@ export const Home = () => {
         {/* "Top Picks for You" — surfaces recently viewed titles from the
             user's browsing history so they can quickly revisit content.
             Visible only when the user is logged in and has viewing history. */}
-        {userId && browsingHistory.length > 0 && (
+        {userId && topPicks.length > 0 && (
           <section className="mb-12">
             <SectionHeader
               icon={History}
@@ -393,10 +425,7 @@ export const Home = () => {
               onViewMore={() => navigate('/dashboard')}
             />
             <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-3">
-              {browsingHistory
-                .filter((item, index, self) =>
-                  index === self.findIndex((t) => t.content_id === item.content_id)
-                )
+              {topPicks
                 .map((item) => (
                   <div
                     key={item.id}

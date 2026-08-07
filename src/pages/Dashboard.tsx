@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format, isToday, isThisWeek, parseISO } from "date-fns";
 import { logger } from "@/lib/logger";
 import { SEO } from "@/components/SEO";
+import { fetchReactedContentKeys, reactedKey } from "@/lib/reactedContent";
 
 // Interface for reminder data structure
 interface Reminder {
@@ -88,18 +89,28 @@ export const Dashboard = () => {
     }
   };
 
-  // Fetch user's browsing history for recommendations
+  // Fetch user's browsing history for recommendations.
+  // Titles the user has already liked or disliked are removed, because the
+  // user has already told us their opinion — recommending them again is noise.
+  // They remain visible in Search, Reminders and the Preferences page.
   const fetchRecommendations = async (uid: string) => {
     try {
-      const { data, error } = await supabase
-        .from('browsing_history')
-        .select('*')
-        .eq('user_id', uid)
-        .order('viewed_at', { ascending: false });
+      const [{ data, error }, reacted] = await Promise.all([
+        supabase
+          .from('browsing_history')
+          .select('*')
+          .eq('user_id', uid)
+          .order('viewed_at', { ascending: false }),
+        fetchReactedContentKeys(uid),
+      ]);
 
       if (error) throw error;
 
-      setRecommendations(data || []);
+      const withoutFeedback = (data || []).filter(
+        (item) => !reacted.has(reactedKey(item.content_type, item.content_id))
+      );
+      setRecommendations(withoutFeedback);
+
     } catch (error: any) {
       // Log error only in development to prevent info disclosure
       logger.error('Error fetching recommendations:', error);
