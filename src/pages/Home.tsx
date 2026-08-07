@@ -14,6 +14,7 @@ import { sortByUserPreferences, sortByUserPreferencesStrong, UserPreferences } f
 import { logger } from "@/lib/logger";
 import { Sparkles } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
+import { fetchReactedContentKeys, reactedKey } from "@/lib/reactedContent";
 
 /**
  * Map of language NAMES (as stored in profile preferences) to TMDB ISO 639-1
