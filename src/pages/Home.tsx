@@ -407,7 +407,7 @@ export const Home = () => {
         {/* "Top Picks for You" — surfaces recently viewed titles from the
             user's browsing history so they can quickly revisit content.
             Visible only when the user is logged in and has viewing history. */}
-        {userId && browsingHistory.length > 0 && (
+        {userId && topPicks.length > 0 && (
           <section className="mb-12">
             <SectionHeader
               icon={History}
@@ -415,10 +415,7 @@ export const Home = () => {
               onViewMore={() => navigate('/dashboard')}
             />
             <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-3">
-              {browsingHistory
-                .filter((item, index, self) =>
-                  index === self.findIndex((t) => t.content_id === item.content_id)
-                )
+              {topPicks
                 .map((item) => (
                   <div
                     key={item.id}
