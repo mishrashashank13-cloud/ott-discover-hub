@@ -335,8 +335,11 @@ serve(async (req) => {
         );
       }
       const raw = await tmdbRequest(`/search/multi?query=${encodeURIComponent(query)}&region=IN`);
-      const filtered = await filterSearchResultsByIndiaOtt(raw?.results ?? []);
-      responseData = { ...raw, results: filtered };
+      // Keep every match, but tag India OTT availability so the UI can badge
+      // titles that cannot be streamed in India.
+      const annotated = await annotateSearchResultsWithIndiaOtt(raw?.results ?? []);
+      responseData = { ...raw, results: annotated };
+
     }
     // =========================================================================
     // Movie details and credits
