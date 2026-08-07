@@ -8,9 +8,15 @@ import { RemindMeButton } from "@/components/RemindMeButton";
 interface MovieCardProps {
   item: Movie | TVShow;
   className?: string;
+  /**
+   * When true, the title has no OTT streaming option in India. The card is
+   * dimmed and gets a clear "Not available in India" badge, but stays
+   * clickable so users can still read its details.
+   */
+  unavailableInIndia?: boolean;
 }
 
-export const MovieCard = ({ item, className }: MovieCardProps) => {
+export const MovieCard = ({ item, className, unavailableInIndia = false }: MovieCardProps) => {
   const navigate = useNavigate();
   const title = isMovie(item) ? item.title : item.name;
   const releaseDate = isMovie(item) ? item.release_date : item.first_air_date;
@@ -35,10 +41,13 @@ export const MovieCard = ({ item, className }: MovieCardProps) => {
           // Alt text includes media type so screen readers get a meaningful
           // 2+ word description even for short titles ("Joker movie poster").
           alt={`${title} ${isMovie(item) ? 'movie' : 'TV show'} poster`}
-          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
+          className={`h-full w-full object-cover transition-transform duration-300 group-hover:scale-110 ${
+            unavailableInIndia ? 'opacity-50 grayscale' : ''
+          }`}
           loading="lazy"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
         
         {/* Rating badge */}
         <div className="absolute top-1.5 right-1.5 flex items-center gap-0.5 bg-black/70 backdrop-blur-sm rounded-md px-1.5 py-0.5">
@@ -54,7 +63,17 @@ export const MovieCard = ({ item, className }: MovieCardProps) => {
             {isMovie(item) ? 'Movie' : 'TV Show'}
           </Badge>
         </div>
+
+        {/* Availability badge - only for titles with no India OTT option */}
+        {unavailableInIndia && (
+          <div className="absolute bottom-1.5 left-1.5 right-1.5">
+            <Badge variant="destructive" className="w-full justify-center text-[9px] h-4 px-1">
+              Not available in India
+            </Badge>
+          </div>
+        )}
       </div>
+
 
       <div className="p-2">
         <h3 className="font-semibold text-xs text-foreground line-clamp-1 mb-0.5">{title}</h3>

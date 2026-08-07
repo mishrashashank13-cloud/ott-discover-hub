@@ -265,12 +265,25 @@ export const Search = () => {
           )}
 
           {results && results.length > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {results.map((item) => (
-                <MovieCard key={item.id} item={item} />
-              ))}
-            </div>
+            <>
+              {/* Explain the badge only when some result is unavailable in India */}
+              {results.some((item: any) => item.in_ott_available === false) && (
+                <p className="text-sm text-muted-foreground mb-4">
+                  Titles marked "Not available in India" have no Indian OTT streaming option right now.
+                </p>
+              )}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                {results.map((item: any) => (
+                  <MovieCard
+                    key={item.id}
+                    item={item}
+                    unavailableInIndia={item.in_ott_available === false}
+                  />
+                ))}
+              </div>
+            </>
           )}
+
 
           {!searchQuery && !category && (
             <div className="text-center py-16">

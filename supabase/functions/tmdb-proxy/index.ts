@@ -161,14 +161,15 @@ function withIndiaOttFilters(params: URLSearchParams): URLSearchParams {
 }
 
 /**
- * For an array of search results (each having id + media_type), keep only
- * those that are streamable on an India OTT provider. Items missing
- * media_type, or whose provider lookup returns no India entry, are dropped.
+ * For an array of search results (each having id + media_type), mark each
+ * movie/TV item with `in_ott_available` telling whether it can be streamed on
+ * an India OTT provider. Items that are neither movies nor TV shows (people)
+ * are dropped, because they have no watch providers at all.
  *
- * This enforces the rule for the search endpoint, which can't be filtered
- * server-side by TMDB directly.
+ * We annotate instead of filtering so the search page can still show the
+ * title, but visibly badge it as "Not available in India".
  */
-async function filterSearchResultsByIndiaOtt(results: any[]): Promise<any[]> {
+async function annotateSearchResultsWithIndiaOtt(results: any[]): Promise<any[]> {
   // India OTT provider IDs as a Set for fast membership checks.
   const allowed = new Set(INDIA_OTT_PROVIDERS.split('|').map((id) => Number(id)));
 
@@ -177,7 +178,7 @@ async function filterSearchResultsByIndiaOtt(results: any[]): Promise<any[]> {
 
   // Limit concurrent provider lookups to avoid hammering TMDB.
   const concurrency = 6;
-  const kept: any[] = [];
+  const annotated: any[] = [];
 
   for (let i = 0; i < candidates.length; i += concurrency) {
     const batch = candidates.slice(i, i + concurrency);
@@ -185,24 +186,31 @@ async function filterSearchResultsByIndiaOtt(results: any[]): Promise<any[]> {
       try {
         const data = await tmdbRequest(`/${item.media_type}/${item.id}/watch/providers`);
         const india = data?.results?.IN;
-        if (!india) return null;
         // A title counts as "available in India" if any of flatrate/ads/free
-        // matches our OTT whitelist. We exclude buy/rent because rule says
+        // matches our OTT whitelist. We exclude buy/rent because the rule says
         // listing must be on a network/OTT (subscription or free).
-        const buckets = [india.flatrate, india.ads, india.free].filter(Boolean) as any[][];
-        const hasAllowed = buckets.some((bucket) =>
-          bucket.some((p) => allowed.has(p.provider_id))
-        );
-        return hasAllowed ? item : null;
+        const buckets = india
+          ? ([india.flatrate, india.ads, india.free].filter(Boolean) as any[][])
+          : [];
+        const matched = buckets
+          .flat()
+          .filter((p: any) => allowed.has(p.provider_id));
+        return { ...item, in_ott_available: matched.length > 0, in_ott_providers: matched };
       } catch {
-        return null;
+        // Provider lookup failed — treat as unknown/unavailable but keep item.
+        return { ...item, in_ott_available: false, in_ott_providers: [] };
       }
     }));
-    for (const k of checks) if (k) kept.push(k);
+    annotated.push(...checks);
   }
 
-  return kept;
+  // Available titles first, unavailable ones after (stable within each group).
+  return [
+    ...annotated.filter((i) => i.in_ott_available),
+    ...annotated.filter((i) => !i.in_ott_available),
+  ];
 }
+
 
 function isCatalogRequest(path: string): boolean {
   return [
@@ -327,8 +335,11 @@ serve(async (req) => {
         );
       }
       const raw = await tmdbRequest(`/search/multi?query=${encodeURIComponent(query)}&region=IN`);
-      const filtered = await filterSearchResultsByIndiaOtt(raw?.results ?? []);
-      responseData = { ...raw, results: filtered };
+      // Keep every match, but tag India OTT availability so the UI can badge
+      // titles that cannot be streamed in India.
+      const annotated = await annotateSearchResultsWithIndiaOtt(raw?.results ?? []);
+      responseData = { ...raw, results: annotated };
+
     }
     // =========================================================================
     // Movie details and credits
