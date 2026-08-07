@@ -50,6 +50,10 @@ export const Home = () => {
   // surface always feels fresh.
   const [excludedMovieIds, setExcludedMovieIds] = useState<Set<number>>(new Set());
   const [excludedTvIds, setExcludedTvIds] = useState<Set<number>>(new Set());
+  // "type:id" keys of every title the user has liked or disliked. These are
+  // hidden from ALL recommendation ribbons (feedback already given), but stay
+  // visible in Search, Reminders and the Preferences page.
+  const [reactedKeys, setReactedKeys] = useState<Set<string>>(new Set());
   // Browsing history items used to build the "Top Picks for You" ribbon.
   const [browsingHistory, setBrowsingHistory] = useState<Tables<'browsing_history'>[]>([]);
   
@@ -73,7 +77,10 @@ export const Home = () => {
             genre_preferences: (profile.genre_preferences as any) || [],
           });
         }
-        
+
+        // Load every liked/disliked title so recommendations can skip them.
+        setReactedKeys(await fetchReactedContentKeys(user.id));
+
         // Fetch user preferences and extract genre IDs for recommendations
         const { data: preferences } = await supabase
           .from('user_preferences')
@@ -87,12 +94,17 @@ export const Home = () => {
           const excludedMovies = new Set<number>();
           const excludedTv = new Set<number>();
 
-          // Fetch details for each preferred content to get genre IDs
-          for (const pref of preferences.slice(0, 5)) { // Limit to first 5 to avoid too many API calls
+          // Every reacted title is excluded from recommendations…
+          preferences.forEach((pref) => {
             const numericId = Number(pref.content_id);
             if (pref.content_type === 'movie') excludedMovies.add(numericId);
             else if (pref.content_type === 'tv') excludedTv.add(numericId);
+          });
 
+          // …but only the first few are looked up on TMDB for genre signals,
+          // to keep the number of API calls small.
+          for (const pref of preferences.slice(0, 5)) {
+            const numericId = Number(pref.content_id);
             try {
               if (pref.content_type === 'movie') {
                 const details = await tmdbApi.getMovieDetails(numericId);
@@ -124,6 +136,7 @@ export const Home = () => {
           setExcludedMovieIds(excludedMovies);
           setExcludedTvIds(excludedTv);
         }
+
 
         // Pull the user's recent browsing history to populate the
         // "Top Picks for You" ribbon on the home page.
