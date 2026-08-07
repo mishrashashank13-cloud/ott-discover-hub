@@ -63,7 +63,17 @@ export const MovieCard = ({ item, className, unavailableInIndia = false }: Movie
             {isMovie(item) ? 'Movie' : 'TV Show'}
           </Badge>
         </div>
+
+        {/* Availability badge - only for titles with no India OTT option */}
+        {unavailableInIndia && (
+          <div className="absolute bottom-1.5 left-1.5 right-1.5">
+            <Badge variant="destructive" className="w-full justify-center text-[9px] h-4 px-1">
+              Not available in India
+            </Badge>
+          </div>
+        )}
       </div>
+
 
       <div className="p-2">
         <h3 className="font-semibold text-xs text-foreground line-clamp-1 mb-0.5">{title}</h3>
