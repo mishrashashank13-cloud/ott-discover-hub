@@ -15,3 +15,8 @@ verify_jwt = true
 # Require a valid Supabase JWT (anon key is fine for guests browsing titles)
 # so the Watchmode quota cannot be drained by random external callers.
 verify_jwt = true
+
+[functions.ai-recommendations]
+# Personalized AI picks: a valid Supabase JWT is required so only the
+# signed-in user can ask for (and pay for) their own recommendations.
+verify_jwt = true
