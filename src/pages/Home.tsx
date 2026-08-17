@@ -480,6 +480,59 @@ export const Home = () => {
           </section>
         )}
 
+        {/* "AI Picks for You" — AI-generated ribbon (logged-in users only).
+            The AI reads the user's full taste profile (languages, genres,
+            likes, dislikes, browsing history) on the server and suggests
+            titles; each suggestion is matched to a real TMDB title here. */}
+        {userId && (
+          <section className="mb-12">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <Wand2 className="h-6 w-6 text-primary" />
+                <h2 className="text-2xl font-bold text-foreground">AI Picks for You</h2>
+                <Badge variant="secondary" className="text-[10px]">Powered by AI</Badge>
+              </div>
+              {/* Lets the user ask the AI for a fresh set of picks. */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => refetchAiRecommendations()}
+                disabled={aiRecommendationsFetching}
+                className="text-primary"
+              >
+                <RefreshCw
+                  className={`h-4 w-4 mr-1 ${aiRecommendationsFetching ? 'animate-spin' : ''}`}
+                />
+                Refresh
+              </Button>
+            </div>
+
+            {aiRecommendationsLoading ? (
+              <LoadingCarousel />
+            ) : aiRecommendationsError ? (
+              <ErrorAlert message={(aiRecommendationsError as Error).message} />
+            ) : (aiRecommendations?.length ?? 0) === 0 ? (
+              <ErrorAlert message="Like a few titles or browse around — the AI needs a little taste data first." />
+            ) : (
+              <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-3">
+                {aiRecommendations!.slice(0, 16).map(({ item, reason }) => (
+                  <div key={`ai-${'title' in item ? 'm' : 't'}-${item.id}`}>
+                    <MovieCard item={item} />
+                    {/* One-line explanation of WHY the AI picked this title. */}
+                    {reason && (
+                      <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">
+                        {reason}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+
+
         {/* "Recommended for You" — personalized blended ribbon (logged-in only).
             Mixes movies + TV shows derived from the user's liked content,
             browsing history exclusions, and ranked language/genre profile
