@@ -15,6 +15,9 @@ import { logger } from "@/lib/logger";
 import { Sparkles } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { fetchReactedContentKeys, reactedKey } from "@/lib/reactedContent";
+import { fetchAiRecommendations } from "@/lib/aiRecommendations";
+import { Wand2, RefreshCw } from "lucide-react";
+
 
 /**
  * Map of language NAMES (as stored in profile preferences) to TMDB ISO 639-1
