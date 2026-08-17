@@ -253,10 +253,33 @@ export const Home = () => {
     }
     return out;
   }, [personalizedMovies, personalizedTVShows, excludedMovieIds, excludedTvIds, userPreferences]);
-
+  /**
+   * "AI Picks for You" ribbon.
+   *
+   * Sends nothing from the browser: the secure `ai-recommendations` edge
+   * function reads the signed-in user's languages, genres, liked/disliked
+   * titles and browsing history, asks the AI model what to watch next, and
+   * the helper below turns those title names into real TMDB cards.
+   * Titles the user has already reacted to are filtered out.
+   */
+  const {
+    data: aiRecommendations,
+    isLoading: aiRecommendationsLoading,
+    isFetching: aiRecommendationsFetching,
+    error: aiRecommendationsError,
+    refetch: refetchAiRecommendations,
+  } = useQuery({
+    queryKey: ["ai-recommendations", userId, reactedKeys.size],
+    queryFn: () => fetchAiRecommendations(reactedKeys),
+    enabled: !!userId,
+    // The server already caches for 12 hours; avoid extra round trips.
+    staleTime: 1000 * 60 * 30,
+    retry: false,
+  });
 
   
   const {
+
     data: trendingMovies,
     isLoading: trendingMoviesLoading,
     error: trendingMoviesError,
