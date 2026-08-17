@@ -92,7 +92,10 @@ function parseSuggestions(raw: string): Suggestion[] {
     .map((item: any): Suggestion => ({
       title: clean(item?.title),
       year: Number.isFinite(Number(item?.year)) ? Number(item.year) : null,
-      type: item?.type === 'tv' ? 'tv' : 'movie',
+      // Models sometimes answer "series" or "show" instead of "tv".
+      type: /^(tv|series|show|web series)$/i.test(String(item?.type ?? '').trim())
+        ? 'tv'
+        : 'movie',
       reason: clean(item?.reason, 160),
     }))
     .filter((item: Suggestion) => item.title.length > 0)
