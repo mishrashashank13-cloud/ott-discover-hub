@@ -422,8 +422,10 @@ export const Home = () => {
 
         {/* Page H1 — describes the whole page and appears first in reading order. */}
         <header className="mb-10">
-          <h1 className="text-3xl md:text-4xl font-bold text-foreground">
-            BingeGuide: Your OTT Content Tracker and Reminder System
+          <h1 className="text-3xl md:text-4xl font-normal text-foreground leading-tight">
+            <span className="font-bold bg-hero-gradient bg-clip-text text-transparent">BingeGuide</span>
+            <br />
+            <span className="text-muted-foreground">Your OTT Content Tracker and Reminder System</span>
           </h1>
           <p className="mt-2 text-muted-foreground">
             Browse trending, upcoming, and recommended OTT releases — all in one place.
